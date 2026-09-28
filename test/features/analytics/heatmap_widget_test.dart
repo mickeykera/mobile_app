@@ -1,5 +1,7 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:ascend/features/analytics/presentation/widgets/heatmap_widget.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('heatmapStartDate', () {
@@ -59,6 +61,77 @@ void main() {
 
     test('returns 0 for an empty map', () {
       expect(heatmapMaxValue({}, start, 4), 0);
+    });
+  });
+
+  group('HeatmapWidget', () {
+    // The reported bug: the legend read "Max: 4" while every cell was empty,
+    // because the drawn window ended a week before the data.
+    testWidgets("renders today's value in a single-week grid", (tester) async {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: HeatmapWidget(
+              data: {today: 4},
+              weeks: 1,
+              color: Colors.purple,
+              label: 'Habit Completions',
+            ),
+          ),
+        ),
+      ));
+
+      // The legend reports the max...
+      expect(find.text('Max: 4'), findsOneWidget);
+      // ...and the value is actually drawn in a cell.
+      expect(find.text('4'), findsOneWidget);
+    });
+
+    testWidgets('a value outside the window is not drawn', (tester) async {
+      final now = DateTime.now();
+      final old = DateTime(now.year, now.month, now.day)
+          .subtract(const Duration(days: 30));
+
+      await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: HeatmapWidget(
+              data: {old: 7},
+              weeks: 1,
+              color: Colors.purple,
+              label: 'Habit Completions',
+            ),
+          ),
+        ),
+      ));
+
+      // Outside the window, so neither the cell nor a misleading legend shows.
+      expect(find.text('7'), findsNothing);
+      expect(find.text('Max: 7'), findsNothing);
+      expect(find.text('Max: 1'), findsOneWidget);
+    });
+
+    testWidgets('renders without overflow at several week counts',
+        (tester) async {
+      for (final weeks in [1, 4, 12]) {
+        await tester.pumpWidget(ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: HeatmapWidget(
+                data: {DateTime.now(): 3},
+                weeks: weeks,
+                color: Colors.teal,
+                label: 'Focus Minutes',
+              ),
+            ),
+          ),
+        ));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'weeks=$weeks');
+      }
     });
   });
 }

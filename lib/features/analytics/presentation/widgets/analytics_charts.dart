@@ -25,6 +25,12 @@ class CategoryBarChart extends StatelessWidget {
     final entries = data.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final maxValue = entries.isEmpty ? 1.0 : entries.first.value.toDouble();
+    final interval = _axisInterval(maxValue);
+    // Round the headroom up to a whole tick. A bare `maxValue * 1.2` lands on a
+    // fractional tick (2 -> 2.4), and since the label is produced with
+    // `toInt()` that tick printed the same "2" as the tick below it, so the
+    // axis read `2, 2, 1` instead of `2, 1`.
+    final axisMaxY = _axisMax(maxValue, interval);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -38,7 +44,7 @@ class CategoryBarChart extends StatelessWidget {
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
-              maxY: maxValue * 1.2,
+              maxY: axisMaxY,
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
                   getTooltipColor: (group) => theme.colorScheme.inverseSurface,
@@ -79,7 +85,7 @@ class CategoryBarChart extends StatelessWidget {
                   sideTitles: SideTitles(
                     showTitles: true,
                     reservedSize: 30,
-                    interval: _axisInterval(maxValue),
+                    interval: interval,
                     getTitlesWidget: (value, meta) => Text(
                       value.toInt().toString(),
                       style: theme.textTheme.labelSmall
@@ -613,4 +619,13 @@ double _axisInterval(double maxValue) {
   if (maxValue <= 0) return 1;
   final step = (maxValue / 4).ceil();
   return step < 1 ? 1.0 : step.toDouble();
+}
+
+/// Upper bound for the axis: `maxValue` plus ~20% headroom, rounded up to a
+/// whole multiple of [interval] so every rendered tick is a distinct label.
+double _axisMax(double maxValue, double interval) {
+  final step = interval <= 0 ? 1.0 : interval;
+  final padded = maxValue <= 0 ? step : maxValue * 1.2;
+  final ticks = (padded / step).ceil();
+  return (ticks < 1 ? 1 : ticks) * step;
 }
