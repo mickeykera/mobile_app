@@ -29,9 +29,17 @@ class AppColors {
   static const Color onSecondaryContainerDark = Color(0xFFDDE7E0);
 
   static const Color tertiaryContainerLight = Color(0xFFF7E3CE);
-  static const Color tertiaryContainerDark = Color(0xFF563A1F);
+  // `tertiaryContainerDark` is the end colour of the Analytics and Journal header
+  // gradients (`secondaryContainer -> tertiaryContainer`). It was originally a
+  // saturated brown (#563A1F, S=64%), which fought the teal and turned the
+  // gradient to mud. Halving the saturation alone was not enough -- at S=33% it
+  // still read as brown on screen. At S=14% it is essentially a warm neutral,
+  // so the gradient now travels from teal through a warm near-grey rather than
+  // into a competing colour, and it still reads warm against the cool teal.
+  // Text contrast on it improves too (8.33 -> 9.35).
+  static const Color tertiaryContainerDark = Color(0xFF3B3A33);
   static const Color onTertiaryContainerLight = Color(0xFF3A2410);
-  static const Color onTertiaryContainerDark = Color(0xFFF7E3CE);
+  static const Color onTertiaryContainerDark = Color(0xFFF2E7D8);
 
   static const Color outlineLight = Color(0xFF7A7264);
   static const Color outlineDark = Color(0xFF9A9184);
