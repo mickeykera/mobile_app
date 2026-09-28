@@ -48,3 +48,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Local DevTools state; developer-specific.
+devtools_options.yaml
