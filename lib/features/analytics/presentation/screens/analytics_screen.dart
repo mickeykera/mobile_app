@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../app/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/analytics_controller.dart';
@@ -339,15 +341,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
   Widget _buildMoodDistributionSection(
       BuildContext context, AnalyticsState state) {
+    // One shared ramp for both charts: previously these two hand-picked
+    // colours that overlapped (three of five were identical between them)
+    // and read as pure material red/green rather than app colours.
     return DistributionPieChart(
       data: state.moodDistribution,
-      colors: const [
-        Colors.red,
-        Colors.orange,
-        Colors.grey,
-        Colors.lightGreen,
-        Colors.green
-      ],
+      colors: AppColors.ratingScale(Theme.of(context).colorScheme),
       label: 'Mood Distribution',
     );
   }
@@ -356,13 +355,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       BuildContext context, AnalyticsState state) {
     return DistributionPieChart(
       data: state.energyDistribution,
-      colors: const [
-        Colors.red,
-        Colors.orange,
-        Colors.grey,
-        Colors.lightBlue,
-        Colors.blue
-      ],
+      colors: AppColors.ratingScale(Theme.of(context).colorScheme),
       label: 'Energy Distribution',
     );
   }

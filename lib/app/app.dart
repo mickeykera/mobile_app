@@ -5,8 +5,45 @@ import 'package:ascend/app/theme/app_theme.dart';
 import 'package:ascend/app/router.dart';
 import 'package:ascend/core/database/database.dart';
 
+class AscendScrollBehavior extends MaterialScrollBehavior {
+  /// Android 12+ draws a stretchy overscroll by default, which pulls the whole
+  /// page past its bounds and looks broken on a screen that is mostly a
+  /// gradient header. A glow indicator is used on Android instead, and iOS
+  /// keeps its native bounce.
+  const AscendScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    // A glow tints the edge; the Android 12+ default instead scales and
+    // deforms the content, which is the "stretches when I scroll" effect.
+    switch (details.direction) {
+      case AxisDirection.down:
+        return GlowingOverscrollIndicator(
+          axisDirection: AxisDirection.down,
+          color: Theme.of(context).colorScheme.primary,
+          child: child,
+        );
+      case AxisDirection.up:
+        return GlowingOverscrollIndicator(
+          axisDirection: AxisDirection.up,
+          color: Theme.of(context).colorScheme.primary,
+          child: child,
+        );
+      case AxisDirection.left:
+      case AxisDirection.right:
+        return child;
+    }
+  }
+}
+
 class AscendApp extends ConsumerWidget {
   const AscendApp({super.key});
+
+  static const _scrollBehavior = AscendScrollBehavior();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,6 +58,7 @@ class AscendApp extends ConsumerWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.system,
+            scrollBehavior: _scrollBehavior,
             home: const _LoadingScreen(),
             debugShowCheckedModeBanner: false,
           );
@@ -31,6 +69,7 @@ class AscendApp extends ConsumerWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.system,
+            scrollBehavior: _scrollBehavior,
             home: _ErrorScreen(error: snapshot.error.toString()),
             debugShowCheckedModeBanner: false,
           );
@@ -41,6 +80,7 @@ class AscendApp extends ConsumerWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
+          scrollBehavior: _scrollBehavior,
           routerConfig: router,
           debugShowCheckedModeBanner: false,
         );

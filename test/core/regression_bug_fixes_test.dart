@@ -1,9 +1,12 @@
+import 'package:ascend/app/theme/app_colors.dart';
 import 'package:ascend/core/extensions/date_extensions.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
 import 'package:ascend/features/focus/domain/entities/focus_session.dart';
 import 'package:ascend/features/habits/domain/entities/habit.dart';
 import 'package:ascend/features/habits/domain/entities/habit_completion.dart';
 import 'package:ascend/features/journal/domain/entities/journal_entry.dart';
-import 'package:flutter_test/flutter_test.dart';
 
 /// Regression tests for bugs found in a full review pass.
 void main() {
@@ -122,6 +125,62 @@ void main() {
     });
   });
 
+  group('foreground chosen for coloured fills', () {
+    // White was hard-coded on the check marks and selected chips. It scores
+    // below WCAG AA on three of the four category accents and just 1.86:1 on
+    // the mint primary, so the tick now picks the better of the two.
+    test('is readable on every habit category colour', () {
+      final categories = {
+        'Mind': AppColors.habitMind,
+        'Body': AppColors.habitBody,
+        'Craft': AppColors.habitCraft,
+        'Discipline': AppColors.habitDiscipline,
+      };
+      for (final entry in categories.entries) {
+        for (final scheme in [
+          AppColors.lightColorScheme,
+          AppColors.darkColorScheme
+        ]) {
+          final on = AppColors.onColorFor(entry.value, scheme);
+          final ratio = _contrastRatio(on, entry.value);
+          // The tick is a non-text graphic, so WCAG 1.4.11 applies the 3:1 bar
+          // rather than the 4.5:1 used for text.
+          expect(ratio, greaterThanOrEqualTo(3.0),
+              reason: '${entry.key} on ${scheme.brightness}');
+        }
+      }
+    });
+
+    test('is readable on the rating colours', () {
+      for (final scheme in [
+        AppColors.lightColorScheme,
+        AppColors.darkColorScheme
+      ]) {
+        for (final rating in [1, 2, 3, 4, 5]) {
+          final fill = AppColors.ratingColor(scheme, rating);
+          final on = AppColors.onColorFor(fill, scheme);
+          // The chip shows a digit, so the stricter 4.5:1 text bar applies.
+          expect(_contrastRatio(on, fill), greaterThanOrEqualTo(4.5),
+              reason: 'rating $rating on ${scheme.brightness}');
+        }
+      }
+    });
+  });
+
+  group('rating colours come from the theme', () {
+    test('are not the raw material red/orange/green', () {
+      final scheme = AppColors.darkColorScheme;
+      expect(AppColors.ratingColor(scheme, 1), isNot(const Color(0xFFFF0000)));
+      expect(AppColors.ratingColor(scheme, 3), isNot(const Color(0xFFFF9800)));
+      expect(AppColors.ratingColor(scheme, 5), isNot(const Color(0xFF00FF00)));
+    });
+
+    test('differ between light and dark so they follow the theme', () {
+      expect(AppColors.ratingColor(AppColors.lightColorScheme, 1),
+          isNot(AppColors.ratingColor(AppColors.darkColorScheme, 1)));
+    });
+  });
+
   group('endOfWeek covers the whole final day', () {
     test('ends on the last millisecond of Sunday', () {
       final monday = DateTime(2026, 9, 28); // a Monday
@@ -150,4 +209,13 @@ void main() {
       expect(dstWeek.endOfWeek.millisecond, 999);
     });
   });
+}
+
+/// WCAG relative-luminance contrast ratio between two opaque colours.
+double _contrastRatio(Color a, Color b) {
+  final l1 = a.computeLuminance();
+  final l2 = b.computeLuminance();
+  final lighter = l1 > l2 ? l1 : l2;
+  final darker = l1 > l2 ? l2 : l1;
+  return (lighter + 0.05) / (darker + 0.05);
 }

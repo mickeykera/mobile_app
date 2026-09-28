@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../controllers/journal_controller.dart';
 import '../../domain/entities/journal_entry.dart';
 import '../../../../core/utils/date_utils.dart';
+import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_theme.dart';
 
 class JournalScreen extends ConsumerStatefulWidget {
@@ -150,7 +151,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen>
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: theme.colorScheme.shadow.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -221,11 +222,11 @@ class _JournalScreenState extends ConsumerState<JournalScreen>
     );
   }
 
-  Color _getRatingColor(int rating) {
-    if (rating <= 2) return Colors.red;
-    if (rating == 3) return Colors.orange;
-    return Colors.green;
-  }
+  /// Resolved through the app palette rather than raw `Colors.red`/`orange`/
+  /// `green`, which ignored light and dark entirely. Each widget class keeps
+  /// its own copy because there is no shared context above them.
+  Color _getRatingColor(int rating) =>
+      AppColors.ratingColor(Theme.of(context).colorScheme, rating);
 
   Widget _buildMorningView(BuildContext context, JournalEntry? entry) {
     final prompts = ref
@@ -240,7 +241,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen>
           'Morning Intention',
           'Start your day with clarity',
           Icons.wb_sunny_outlined,
-          Colors.amber,
+          Theme.of(context).colorScheme.tertiary,
           () => _showEntrySheet(context),
         ),
       );
@@ -276,7 +277,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen>
           'Evening Debrief',
           'Reflect on your day',
           Icons.nights_stay_outlined,
-          Colors.indigo,
+          Theme.of(context).colorScheme.primary,
           () => _showEntrySheet(context),
         ),
       );
@@ -427,7 +428,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen>
                       '$value',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: isSelected
-                            ? Colors.white
+                            ? AppColors.onColorFor(color, theme.colorScheme)
                             : theme.colorScheme.onSurfaceVariant,
                         fontWeight:
                             isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -904,7 +905,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                       '$value',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: isSelected
-                            ? Colors.white
+                            ? AppColors.onColorFor(color, theme.colorScheme)
                             : theme.colorScheme.onSurfaceVariant,
                         fontWeight:
                             isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -920,11 +921,11 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
     );
   }
 
-  Color _getRatingColor(int rating) {
-    if (rating <= 2) return Colors.red;
-    if (rating == 3) return Colors.orange;
-    return Colors.green;
-  }
+  /// Resolved through the app palette rather than raw `Colors.red`/`orange`/
+  /// `green`, which ignored light and dark entirely. Each widget class keeps
+  /// its own copy because there is no shared context above them.
+  Color _getRatingColor(int rating) =>
+      AppColors.ratingColor(Theme.of(context).colorScheme, rating);
 
   Widget _buildPromptField(String prompt) {
     return Padding(

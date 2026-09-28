@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../app/theme/app_colors.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../domain/entities/habit.dart';
@@ -105,7 +107,15 @@ class HabitCard extends StatelessWidget {
                 : null,
           ),
           child: isCompleted
-              ? const Icon(Icons.check, color: Colors.white, size: 24)
+              ? Icon(
+                  Icons.check,
+                  // White fails AA on three of the four category accents
+                  // (and scores just 3.2 on the amber one), so the tick picks
+                  // whichever foreground actually reads against the fill.
+                  color: AppColors.onColorFor(
+                      categoryColor, Theme.of(context).colorScheme),
+                  size: 24,
+                )
               : Icon(Icons.add,
                   color: categoryColor.withValues(alpha: 0.7), size: 24),
         ),

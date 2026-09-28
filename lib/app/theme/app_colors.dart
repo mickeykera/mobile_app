@@ -51,6 +51,80 @@ class AppColors {
   static const Color errorLight = Color(0xFFC62828);
   static const Color errorDark = Color(0xFFEF5350);
 
+  /// Mood/energy rating colours, low to high.
+  ///
+  /// These used to be hard-coded `Colors.red` / `Colors.orange` / `Colors.green`
+  /// inside the journal screen, which ignored the theme entirely and sat oddly
+  /// against the teal/mint palette. They resolve through the `ColorScheme` so
+  /// they follow light and dark automatically.
+  static Color ratingColor(ColorScheme scheme, int rating) {
+    if (rating <= 2) return scheme.error;
+    if (rating == 3) return scheme.tertiary;
+    return scheme.primary;
+  }
+
+  /// A five-step ramp for the 1-5 mood and energy scales.
+  ///
+  /// The distribution charts used to hand-pick `Colors.red`, `Colors.orange`,
+  /// `Colors.grey`, `Colors.lightGreen`, `Colors.green` (and a blue variant for
+  /// energy), so the two charts beside each other shared three colours, drifted
+  /// from the rest of the app, and had no defined meaning per rating. This
+  /// mirrors `ratingColor` so a "1" is the same colour everywhere it appears.
+  static List<Color> ratingScale(ColorScheme scheme) => [
+        scheme.error,
+        scheme.tertiary,
+        scheme.outline,
+        scheme.secondary,
+        scheme.primary,
+      ];
+
+  /// The colour for a 1-5 rating within the scale above.
+  static Color ratingScaleColor(ColorScheme scheme, int rating) {
+    final clamped = rating.clamp(1, 5);
+    return ratingScale(scheme)[clamped - 1];
+  }
+
+  /// A near-black used as foreground on saturated accent fills.
+  ///
+  /// The category accents are all mid-tone, so neither pure white nor the
+  /// scheme's own `onSurface` clears 4.5:1 against most of them - white scores
+  /// just 3.2:1 on the amber "Craft" accent. A dark ink does, on three of the
+  /// four, and where it does not (the rose "Discipline" accent) the helper
+  /// below falls back to white.
+  static const Color accentInk = Color(0xFF0B0F0E);
+
+  /// A legible foreground for text or an icon drawn on top of [background].
+  ///
+  /// Chips and check marks used to hard-code `Colors.white`, which is unreadable
+  /// on the lighter accents. Every candidate is scored with the real WCAG
+  /// relative-luminance formula and the best one wins, so this also keeps
+  /// working when the palette is retuned.
+  static Color onColorFor(Color background, ColorScheme scheme) {
+    final candidates = <Color>[
+      Colors.white,
+      accentInk,
+      scheme.onSurface,
+    ];
+    Color best = candidates.first;
+    var bestRatio = -1.0;
+    for (final candidate in candidates) {
+      final ratio = _contrast(candidate, background);
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        best = candidate;
+      }
+    }
+    return best;
+  }
+
+  static double _contrast(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final lighter = la > lb ? la : lb;
+    final darker = la > lb ? lb : la;
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
   /// Habit category colours.
   ///
   /// These were duplicated as raw literals in `habit_form.dart` and

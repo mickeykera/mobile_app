@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../app/theme/app_colors.dart';
 import 'package:fl_chart/fl_chart.dart';
 // `intl` exports its own `TextDirection`, which would shadow the one that
 // `TextPainter` needs inside `_CorrelationPainter`.
@@ -164,11 +166,19 @@ class _CorrelationPainter extends CustomPainter {
   final double maxX;
   final double maxY;
 
+  /// Supplied by the caller: a `CustomPainter` has no `BuildContext`, so the
+  /// axes and labels used to be pinned to a fixed `Colors.grey` that did not
+  /// match the theme in either brightness.
+  final Color axisColor;
+  final Color labelColor;
+
   _CorrelationPainter({
     required this.points,
     required this.color,
     required this.maxX,
     required this.maxY,
+    required this.axisColor,
+    required this.labelColor,
   });
 
   @override
@@ -176,7 +186,7 @@ class _CorrelationPainter extends CustomPainter {
     if (points.isEmpty) return;
 
     final axisPaint = Paint()
-      ..color = Colors.grey.withValues(alpha: 0.3)
+      ..color = axisColor.withValues(alpha: 0.3)
       ..strokeWidth = 1;
 
     // Draw axes
@@ -209,7 +219,7 @@ class _CorrelationPainter extends CustomPainter {
       final textPainter = TextPainter(
         text: TextSpan(
             text: '${value.toInt()}%',
-            style: const TextStyle(color: Colors.grey, fontSize: 10)),
+            style: TextStyle(color: labelColor, fontSize: 10)),
         textDirection: TextDirection.ltr,
       );
       textPainter.layout();
@@ -228,7 +238,7 @@ class _CorrelationPainter extends CustomPainter {
       final textPainter = TextPainter(
         text: TextSpan(
             text: value.toInt().toString(),
-            style: const TextStyle(color: Colors.grey, fontSize: 10)),
+            style: TextStyle(color: labelColor, fontSize: 10)),
         textDirection: TextDirection.ltr,
       );
       textPainter.layout();
@@ -327,6 +337,8 @@ class CorrelationScatterChart extends StatelessWidget {
                       color: color,
                       maxX: 100.0,
                       maxY: 5.5,
+                      axisColor: theme.colorScheme.outlineVariant,
+                      labelColor: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -387,8 +399,15 @@ class DistributionPieChart extends StatelessWidget {
         value: value.toDouble(),
         title: '$percentage%',
         radius: 60,
-        titleStyle: theme.textTheme.labelSmall
-            ?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+        // The slice fills come from the shared rating ramp, which includes
+        // lighter tones, so a fixed white label was unreadable on some slices.
+        titleStyle: theme.textTheme.labelSmall?.copyWith(
+          color: AppColors.onColorFor(
+            colors[index % colors.length],
+            theme.colorScheme,
+          ),
+          fontWeight: FontWeight.w600,
+        ),
         badgeWidget: value > 0
             ? Text(entry.key.toString(), style: theme.textTheme.labelSmall)
             : null,

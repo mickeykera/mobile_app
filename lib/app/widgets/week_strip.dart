@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 import '../theme/app_theme.dart';
 
 /// How a single day in a [WeekStrip] should be drawn.
@@ -129,7 +131,13 @@ class _DayCell extends StatelessWidget {
         border: Border.all(color: border, width: borderWidth),
       ),
       child: state == WeekDayState.complete
-          ? Icon(Icons.check_rounded, size: size * 0.55, color: Colors.white)
+          ? Icon(
+              Icons.check_rounded,
+              size: size * 0.55,
+              // Same reasoning as the habit card tick: a fixed white tick is
+              // too light on the mint and amber accents.
+              color: AppColors.onColorFor(fill, Theme.of(context).colorScheme),
+            )
           : state == WeekDayState.partial
               ? Center(
                   child: Container(
