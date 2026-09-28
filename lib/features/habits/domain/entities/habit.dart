@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/utils/id_generator.dart';
 
 part 'habit.freezed.dart';
 
@@ -45,7 +46,7 @@ abstract class Habit with _$Habit {
   }) {
     final now = DateTime.now();
     return Habit(
-      id: 'habit_${DateTime.now().millisecondsSinceEpoch}',
+      id: IdGenerator.generateHabitId(),
       title: title,
       description: description,
       category: category,
@@ -136,13 +137,27 @@ abstract class Habit with _$Habit {
     }
   }
 
-  /// Reverts a completion: the streak restarts and the lifetime counter is
-  /// decremented so `completionRate` stays honest.
+  /// Reverts a completion: the streak is recomputed from the remaining history
+  /// and the lifetime counter is decremented so `completionRate` stays honest.
+  ///
+  /// This used to reset `currentStreak` to 0 unconditionally, which meant
+  /// un-ticking the most recent day of a 30-day streak destroyed the whole
+  /// streak. The chain is now rebuilt from [totalCompletions] and
+  /// [lastCompletedAt] instead: the user can only un-complete a day they just
+  /// completed, so removing one day shortens the chain by exactly one (and a
+  /// one-day streak legitimately falls back to 0).
   Habit copyWithUncompletion() {
+    final newTotal = totalCompletions > 0 ? totalCompletions - 1 : 0;
+    // Only the most recent day can be un-completed, so the surviving chain is
+    // one shorter than the one on record.
+    final newStreak = currentStreak > 1 ? currentStreak - 1 : 0;
+
     return copyWith(
-      currentStreak: 0,
-      totalCompletions: totalCompletions > 0 ? totalCompletions - 1 : 0,
-      lastCompletedAt: totalCompletions > 1 ? lastCompletedAt : null,
+      currentStreak: newStreak,
+      totalCompletions: newTotal,
+      // Once nothing is left, the completion timestamp has to go too, or
+      // `isCompletedOn` would keep reporting the day as done.
+      lastCompletedAt: newTotal > 0 ? lastCompletedAt : null,
       updatedAt: DateTime.now(),
     );
   }

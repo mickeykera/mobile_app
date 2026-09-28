@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../core/utils/id_generator.dart';
+
 part 'focus_session.freezed.dart';
 
 @freezed
@@ -41,7 +43,7 @@ abstract class FocusSession with _$FocusSession {
   }) {
     final now = DateTime.now();
     return FocusSession(
-      id: 'session_${now.millisecondsSinceEpoch}',
+      id: IdGenerator.generateSessionId(),
       mode: mode,
       workDurationMinutes: workDurationMinutes,
       breakDurationMinutes: breakDurationMinutes,

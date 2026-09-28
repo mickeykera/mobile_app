@@ -5,8 +5,12 @@ extension DateTimeExtensions on DateTime {
   DateTime get startOfDay => DateTime(year, month, day);
   DateTime get endOfDay => DateTime(year, month, day, 23, 59, 59, 999);
   DateTime get startOfWeek => startOfDay.subtract(Duration(days: weekday - 1));
+  // The milliseconds matter: `endOfDay` and `endOfMonth` both land on .999, and
+  // a half-open range that stops a millisecond short silently drops the final
+  // instant of the period.
   DateTime get endOfWeek => startOfWeek
-      .add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+      .add(const Duration(days: 7))
+      .subtract(const Duration(milliseconds: 1));
   DateTime get startOfMonth => DateTime(year, month, 1);
   DateTime get endOfMonth => DateTime(year, month + 1, 0, 23, 59, 59, 999);
 
@@ -27,6 +31,26 @@ extension DateTimeExtensions on DateTime {
   String formatRelative() {
     final now = DateTime.now();
     final difference = now.difference(this);
+
+    // A timestamp in the future produces a negative duration, which used to
+    // fall through every branch below and report "Just now" for a date three
+    // days ahead. Journal entries can be backdated or scheduled, so say so
+    // explicitly instead.
+    if (difference.isNegative) {
+      final ahead = this.difference(now);
+      if (ahead.inDays > 365) {
+        return 'in ${ahead.inDays ~/ 365}y';
+      } else if (ahead.inDays > 30) {
+        return 'in ${ahead.inDays ~/ 30}mo';
+      } else if (ahead.inDays > 0) {
+        return 'in ${ahead.inDays}d';
+      } else if (ahead.inHours > 0) {
+        return 'in ${ahead.inHours}h';
+      } else if (ahead.inMinutes > 0) {
+        return 'in ${ahead.inMinutes}m';
+      }
+      return 'Just now';
+    }
 
     if (difference.inDays > 365) {
       return '${difference.inDays ~/ 365}y ago';

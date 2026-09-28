@@ -8,4 +8,6 @@ class IdGenerator {
 
   static String generateHabitId() => 'habit_${generateShort()}';
   static String generateCompletionId() => 'completion_${generateShort()}';
+  static String generateSessionId() => 'session_${generateShort()}';
+  static String generateEntryId() => 'entry_${generateShort()}';
 }

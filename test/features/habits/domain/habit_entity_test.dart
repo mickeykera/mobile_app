@@ -106,7 +106,8 @@ void main() {
       expect(_habit().copyWithCompletion(completed: true).currentStreak, 1);
     });
 
-    test('un-completing resets the streak and decrements the total', () {
+    test('un-completing shortens the streak by one and decrements the total',
+        () {
       final habit = _habit(
         lastCompletedAt: DateTime.now(),
         currentStreak: 5,
@@ -116,7 +117,10 @@ void main() {
 
       final undone = habit.copyWithUncompletion();
 
-      expect(undone.currentStreak, 0);
+      // The surviving completions are still a chain, so losing the most recent
+      // day costs exactly one day. This used to be 0, which threw away a 5-day
+      // streak over a single un-tick.
+      expect(undone.currentStreak, 4);
       // Regression: the old path kept `totalCompletions`, so `completionRate`
       // stayed inflated after the user undid a completion.
       expect(undone.totalCompletions, 8);

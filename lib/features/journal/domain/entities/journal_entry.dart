@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../../core/utils/date_utils.dart';
+import '../../../../core/utils/id_generator.dart';
 
 part 'journal_entry.freezed.dart';
 
@@ -31,7 +32,7 @@ abstract class JournalEntry with _$JournalEntry {
   }) {
     final now = DateTime.now();
     return JournalEntry(
-      id: 'entry_${now.millisecondsSinceEpoch}',
+      id: IdGenerator.generateEntryId(),
       type: 'Morning',
       date: date.startOfDay,
       responses: responses,
@@ -54,7 +55,7 @@ abstract class JournalEntry with _$JournalEntry {
   }) {
     final now = DateTime.now();
     return JournalEntry(
-      id: 'entry_${now.millisecondsSinceEpoch}',
+      id: IdGenerator.generateEntryId(),
       type: 'Evening',
       date: date.startOfDay,
       responses: responses,

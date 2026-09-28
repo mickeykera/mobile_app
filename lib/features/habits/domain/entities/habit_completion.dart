@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../core/utils/id_generator.dart';
+
 part 'habit_completion.freezed.dart';
 
 @freezed
@@ -26,7 +28,7 @@ abstract class HabitCompletion with _$HabitCompletion {
     int? energyRating,
   }) {
     return HabitCompletion(
-      id: 'completion_${DateTime.now().millisecondsSinceEpoch}',
+      id: IdGenerator.generateCompletionId(),
       habitId: habitId,
       completedAt: DateTime.now(),
       count: count,

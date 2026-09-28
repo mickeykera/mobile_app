@@ -385,6 +385,17 @@ class HabitRepositoryImpl implements HabitRepository {
       if (habit == null) {
         return Either.left(const NotFoundFailure('Habit not found'));
       }
+      // `startDate`/`endDate` are accepted for interface symmetry with the
+      // other range-aware queries but are deliberately not applied: the
+      // `completionRate` on the entity is a lifetime figure measured from
+      // `createdAt`, and narrowing it to an arbitrary window would silently
+      // change what the number means to any caller that starts passing dates.
+      // A ranged rate needs its own definition, so this leaves a trace rather
+      // than quietly ignoring the arguments.
+      if (startDate != null || endDate != null) {
+        return Either.left(const ValidationFailure(
+            'getCompletionRate is a lifetime rate and does not accept a date range'));
+      }
       return Either.right(habit.completionRate);
     } catch (e, st) {
       return Either.left(CacheFailure('Failed to get completion rate: $e',
