@@ -1,0 +1,7 @@
+{
+  "terminal.integrated.env.linux": {
+    "ANDROID_HOME": "${env:HOME}/Android/Sdk",
+    "ANDROID_SDK_ROOT": "${env:HOME}/Android/Sdk",
+    "PATH": "${env:HOME}/Android/Sdk/platform-tools:${env:HOME}/Android/Sdk/emulator:${env:PATH}"
+  }
+}

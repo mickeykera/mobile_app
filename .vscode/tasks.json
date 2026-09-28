@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Android: Start Pixel 7 emulator",
+      "type": "shell",
+      "command": "${workspaceFolder}/.vscode/start-emulator.sh",
+      "args": [
+        "Pixel_7"
+      ],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Start Pixel 10 Pro emulator",
+      "type": "shell",
+      "command": "${workspaceFolder}/.vscode/start-emulator.sh",
+      "args": [
+        "Pixel_10_Pro"
+      ],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: List connected devices",
+      "type": "shell",
+      "command": "${env:HOME}/Android/Sdk/platform-tools/adb",
+      "args": [
+        "devices"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Stop emulator",
+      "type": "shell",
+      "command": "${env:HOME}/Android/Sdk/platform-tools/adb",
+      "args": [
+        "emu",
+        "kill"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+Yes, VS Code works great for Flutter development. Here's how to set it up:
+Install VS Code extensions:
+1. Open VS Code
+2. Install "Flutter" extension (by Dart-Code)
+3. Install "Dart" extension (by Dart-Code)
+Run emulator from VS Code:
+1. Press Ctrl+Shift+P → "Flutter: Launch Emulator" → Select Pixel7 or Pixel10_Pro
+2. Or use the terminal in VS Code: flutter emulators --launch Pixel_7
+Run app from VS Code:
+1. Open the project folder in VS Code (/home/michael/projects/app/mobile_app)
+2. Press F5 or Ctrl+F5 to start debugging
+3. Or use the terminal: flutter run -d emulator-5554
+Key VS Code commands (Ctrl+Shift+P):
+- Flutter: Run - Start app
+- Flutter: Hot Restart - Full restart
+- Flutter: Hot Reload - Quick reload (also r in terminal)
+- Flutter: Select Device - Choose emulator/device
+- Dart: Open DevTools - Open debugger/profiler
+Terminal setup for VS Code:
+Add this to your VS Code settings.json (already configured in your .vscode/settings.json):
+"terminal.integrated.env.linux": {
+  "ANDROID_HOME": "${env:HOME}/Android/Sdk",
+  "ANDROID_SDK_ROOT": "${env:HOME}/Android/Sdk",
+  "PATH": "${env:HOME}/Android/Sdk/platform-tools:${env:HOME}/Android/Sdk/emulator:${env:PATH}"
+}
+The .vscode/tasks.json already has tasks to start/stop emulators via Ctrl+Shift+P → "Tasks: Run Task".
