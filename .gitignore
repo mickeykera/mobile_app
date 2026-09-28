@@ -51,3 +51,6 @@ app.*.map.json
 
 # Local DevTools state; developer-specific.
 devtools_options.yaml
+
+# Local agent/tool settings; developer-specific.
+.claude/

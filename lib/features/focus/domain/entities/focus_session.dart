@@ -56,6 +56,12 @@ abstract class FocusSession with _$FocusSession {
       isActive: true,
       isPaused: false,
       isBreak: false,
+      // Initialise to zero so the live clock (elapsedWorkTime / elapsedBreakTime)
+      // works from the very first frame. Previously these were null, which
+      // forced the getters to return Duration.zero and froze the timer ring
+      // and elapsed display for the entire first work phase.
+      accumulatedWorkTime: Duration.zero,
+      accumulatedBreakTime: Duration.zero,
       habitId: habitId,
       projectName: projectName,
     );

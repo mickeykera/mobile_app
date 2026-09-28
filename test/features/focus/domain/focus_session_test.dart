@@ -59,6 +59,27 @@ void main() {
   });
 
   group('FocusSession work accounting', () {
+    test('a freshly created session starts its timer from zero', () {
+      // Regression: `accumulatedWorkTime` and `accumulatedBreakTime` were null
+      // in `FocusSession.create()`, so `elapsedWorkTime` always returned
+      // Duration.zero and the first work phase's ring and elapsed display
+      // stayed frozen until the user paused or completed the phase.
+      final session = _session();
+
+      expect(session.accumulatedWorkTime, isNotNull);
+      expect(session.accumulatedBreakTime, isNotNull);
+      expect(session.elapsedWorkTime.inMilliseconds, lessThan(2000),
+          reason: 'the live clock must start from zero, not be stuck');
+      expect(session.currentPhaseProgress, lessThan(0.01),
+          reason: 'a brand-new work phase must show ~0% progress');
+      // A live clock, so this is either 25:00 or 24:59 depending on whether a
+      // second slipped past between create() and the assertion. Asserting the
+      // exact '25:00' makes the test fail at random on a slow machine.
+      final remaining = session.formattedRemaining;
+      expect(remaining == '25:00' || remaining == '24:59', isTrue,
+          reason: 'the full work duration must be left to run, was $remaining');
+    });
+
     test('finishing a phase rebases the clock so work is not counted twice',
         () {
       // Regression: `completeSession()` reset the accumulated work time but
