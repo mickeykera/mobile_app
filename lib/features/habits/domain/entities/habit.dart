@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../app/theme/app_colors.dart';
+
 part 'habit.freezed.dart';
 
 @freezed
@@ -184,18 +186,21 @@ abstract class Habit with _$Habit {
     }
   }
 
+  /// Category colour, sourced from the theme so habit cards follow the app
+  /// palette. This previously hard-coded its own copy of the four category
+  /// colours, which left cards on the old palette after a retheme.
   int get categoryColorValue {
     switch (category) {
       case 'Mind':
-        return 0xFF6366F1;
+        return AppColors.habitMind.toARGB32();
       case 'Body':
-        return 0xFF10B981;
+        return AppColors.habitBody.toARGB32();
       case 'Craft':
-        return 0xFFF59E0B;
+        return AppColors.habitCraft.toARGB32();
       case 'Discipline':
-        return 0xFFEF4444;
+        return AppColors.habitDiscipline.toARGB32();
       default:
-        return 0xFF6366F1;
+        return AppColors.habitMind.toARGB32();
     }
   }
 

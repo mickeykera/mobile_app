@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/habit.dart';
+import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
 
@@ -481,15 +482,15 @@ class _HabitFormState extends ConsumerState<HabitForm> {
   Color _getCategoryColor(String category) {
     switch (category) {
       case 'Mind':
-        return const Color(0xFF6366F1);
+        return AppColors.habitMind;
       case 'Body':
-        return const Color(0xFF10B981);
+        return AppColors.habitBody;
       case 'Craft':
-        return const Color(0xFFF59E0B);
+        return AppColors.habitCraft;
       case 'Discipline':
-        return const Color(0xFFEF4444);
+        return AppColors.habitDiscipline;
       default:
-        return const Color(0xFF6366F1);
+        return AppColors.habitMind;
     }
   }
 

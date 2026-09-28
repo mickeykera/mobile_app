@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../providers/premium_provider.dart';
+import '../../../../app/theme/app_colors.dart';
 
 class PremiumScreen extends ConsumerStatefulWidget {
   const PremiumScreen({super.key});
@@ -334,42 +335,42 @@ enum _PremiumFeature {
     title: 'Unlimited Habits',
     description: 'Create as many habits as you need without limits',
     icon: Icons.track_changes_rounded,
-    color: Color(0xFF6366F1),
+    color: AppColors.habitMind,
     isFree: true,
   ),
   advancedAnalytics(
     title: 'Advanced Analytics',
     description: 'Detailed insights, trends, and progress reports',
     icon: Icons.analytics_rounded,
-    color: Color(0xFF10B981),
+    color: AppColors.accentCyan,
     isFree: false,
   ),
   customFocus(
     title: 'Custom Focus Sessions',
     description: 'Create custom durations, intervals, and break patterns',
     icon: Icons.timer_outlined,
-    color: Color(0xFFF59E0B),
+    color: AppColors.habitCraft,
     isFree: false,
   ),
   dataExport(
     title: 'Data Export & Backup',
     description: 'Export your data as CSV/JSON or backup to cloud',
     icon: Icons.download_rounded,
-    color: Color(0xFFEF4444),
+    color: AppColors.habitDiscipline,
     isFree: false,
   ),
   cloudSync(
     title: 'Cloud Sync',
     description: 'Sync across all your devices seamlessly',
     icon: Icons.cloud_sync_rounded,
-    color: Color(0xFF8B5CF6),
+    color: AppColors.accentViolet,
     isFree: false,
   ),
   prioritySupport(
     title: 'Priority Support',
     description: 'Get help faster with dedicated support',
     icon: Icons.support_agent_rounded,
-    color: Color(0xFF06B6D4),
+    color: AppColors.habitBody,
     isFree: false,
   );
 
