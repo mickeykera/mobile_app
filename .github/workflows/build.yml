@@ -59,8 +59,19 @@ jobs:
       # which builds fine but is rejected by Play.
       - name: Verify APK is signed with the release key
         run: |
-          SIG=$(apksigner verify --print-certs \
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner not found - cannot verify signing"
+            exit 1
+          fi
+          SIG=$("$APKSIGNER" verify --print-certs \
             build/app/outputs/flutter-apk/app-release.apk | grep -m1 'certificate DN')
+          # Distinguish a real debug signature from a failed lookup, rather
+          # than treating an empty result as "debug signed".
+          if [ -z "$SIG" ]; then
+            echo "::error::could not read a signer from the APK"
+            exit 1
+          fi
           echo "signer: $SIG"
           if echo "$SIG" | grep -q 'Android Debug'; then
             echo "::error::APK is signed with the debug key - not publishable"
