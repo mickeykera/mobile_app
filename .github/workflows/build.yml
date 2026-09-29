@@ -1,0 +1,129 @@
+name: Build
+
+# Android and iOS are separate jobs on purpose. An iOS failure (missing
+# Apple certificate, expired profile) must not block the Android artifact,
+# so neither job uses needs: on the other.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android (APK + AAB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.5'
+          cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The keystore and its passwords are gitignored, so CI has to be given
+      # them. Decode the base64 keystore from KEYSTORE_BASE64 into the same
+      # path key.properties expects.
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$RUNNER_TEMP/release.jks
+          EOF
+
+      - name: Test
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Build release AAB
+        run: flutter build appbundle --release
+
+      # Guards against silently shipping a debug-signed artifact. The gradle
+      # config falls back to the debug key when key.properties is missing,
+      # which builds fine but is rejected by Play.
+      - name: Verify APK is signed with the release key
+        run: |
+          SIG=$(apksigner verify --print-certs \
+            build/app/outputs/flutter-apk/app-release.apk | grep -m1 'certificate DN')
+          echo "signer: $SIG"
+          if echo "$SIG" | grep -q 'Android Debug'; then
+            echo "::error::APK is signed with the debug key - not publishable"
+            exit 1
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release.aab
+          path: build/app/outputs/bundle/release/app-release.aab
+
+  ios:
+    name: iOS (unsigned IPA)
+    runs-on: macos-latest
+    # Skips cleanly until an Apple developer account, certificate and
+    # provisioning profile are configured, rather than failing every build.
+    if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.5'
+          cache: true
+
+      - name: Decode iOS signing assets
+        env:
+          IOS_CERT_P12_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
+          IOS_CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+          IOS_PROVISION_PROFILE: ${{ secrets.IOS_PROVISION_PROFILE }}
+        run: |
+          echo "$IOS_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          echo "$IOS_PROVISION_PROFILE" > "$RUNNER_TEMP/Runner.mobileprovision"
+          # Import into a throwaway keychain rather than the login keychain,
+          # and lock it so the cert can't be read by later steps.
+          security create-keychain -p ci-keychain
+          security default-keychain -s ci-keychain
+          security unlock-keychain -p ci-keychain
+          security import "$RUNNER_TEMP/cert.p12" -k ci-keychain \
+            -P "$IOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k ci-keychain -p ci-keychain > /dev/null
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/Runner.mobileprovision" \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/"
+
+      - name: Build IPA
+        run: flutter build ipa --release --no-codesign
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release.ipa
+          path: build/ios/ipa/*.ipa
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain ci-keychain || true
