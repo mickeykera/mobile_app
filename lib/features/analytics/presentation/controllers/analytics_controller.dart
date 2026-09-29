@@ -49,7 +49,26 @@ class AnalyticsController extends StateNotifier<AnalyticsState> {
     );
 
     if (result.isLeft) {
-      state = state.copyWith(isLoading: false, error: result.left!.userMessage);
+      // Clear stale data from the previous period so the screen renders the
+      // correct empty-state rather than last period's charts under the new
+      // period label.
+      state = state.copyWith(
+        isLoading: false,
+        error: result.left!.userMessage,
+        habitHeatmap: {},
+        categoryCompletions: {},
+        categoryStreaks: {},
+        totalFocusMinutes: 0,
+        focusByCategory: {},
+        focusHeatmap: {},
+        journalEntriesCount: 0,
+        moodDistribution: {},
+        energyDistribution: {},
+        avgMood: 0.0,
+        avgEnergy: 0.0,
+        moodHabitCorrelation: [],
+        energyHabitCorrelation: [],
+      );
       return;
     }
 

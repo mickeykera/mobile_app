@@ -48,13 +48,20 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
             SliverFillRemaining(
               hasScrollBody: false,
               child: AppEmptyState(
-                icon: Icons.insights_rounded,
-                title: 'No data yet',
-                message:
-                    'Complete a habit, run a focus session or write a journal '
-                    'entry and your ${state.selectedPeriod.toLowerCase()} '
-                    'insights will show up here.',
-                accent: Theme.of(context).colorScheme.primary,
+                icon: state.error != null
+                    ? Icons.error_outline
+                    : Icons.insights_rounded,
+                title: state.error != null
+                    ? 'Could not load insights'
+                    : 'No data yet',
+                message: state.error != null
+                    ? state.error!
+                    : 'Complete a habit, run a focus session or write a '
+                        'journal entry and your ${state.selectedPeriod.toLowerCase()} '
+                        'insights will show up here.',
+                accent: state.error != null
+                    ? Theme.of(context).colorScheme.error
+                    : Theme.of(context).colorScheme.primary,
               ),
             )
           else
