@@ -128,12 +128,46 @@ jobs:
             echo "note: bundle is UNSIGNED - not installable on a device"
           fi
 
-      - name: Upload unsigned .app
+      # upload-artifact zips the *contents* of a directory, which flattened
+      # Runner.app into loose files. Repackage it into a real .ipa instead:
+      # a Payload/Runner.app wrapper, which is the container format iOS
+      # expects. The result is a genuine .ipa, but with no code signature
+      # iOS will refuse to install it.
+      - name: Package as IPA
+        run: |
+          set -e
+          rm -rf build/ios/ipa_unsigned
+          mkdir -p build/ios/ipa_unsigned/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/ipa_unsigned/Payload/
+          cd build/ios/ipa_unsigned
+          zip -qry ../app-unsigned.ipa Payload
+          cd - > /dev/null
+          ls -la build/ios/app-unsigned.ipa
+
+      - name: Verify the IPA structure
+        run: |
+          IPA=build/ios/app-unsigned.ipa
+          if [ ! -f "$IPA" ]; then
+            echo "::error::ipa was not produced"
+            exit 1
+          fi
+          # An .ipa must contain Payload/<App>.app/Info.plist
+          if ! unzip -l "$IPA" | grep -q 'Payload/Runner.app/Info.plist'; then
+            echo "::error::ipa is missing Payload/Runner.app/Info.plist"
+            unzip -l "$IPA" | head -20
+            exit 1
+          fi
+          echo "ipa structure OK:"
+          unzip -l "$IPA" | grep -E 'Payload/Runner.app/(Info.plist|Runner)$'
+          echo "entries: $(unzip -l "$IPA" | tail -1 | awk '{print $2}')"
+
+      - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: app-ios-unsigned.app
-          path: build/ios/iphoneos/Runner.app
+          name: app-unsigned.ipa
+          path: build/ios/app-unsigned.ipa
           retention-days: 14
+
 
       # The signed path only runs once an Apple developer account, a
       # distribution certificate and a provisioning profile exist.
