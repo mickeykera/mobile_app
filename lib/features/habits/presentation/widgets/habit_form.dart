@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/habit.dart';
-import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/category_type.dart';
 
 class HabitForm extends ConsumerStatefulWidget {
   final Habit? habit;
@@ -21,7 +21,7 @@ class _HabitFormState extends ConsumerState<HabitForm> {
   final _descriptionController = TextEditingController();
   final _cueController = TextEditingController();
 
-  String _category = AppConstants.habitCategoryMind;
+  String _category = CategoryType.mind.title;
   String _frequency = AppConstants.frequencyDaily;
   List<int> _customWeekdays = [];
   String _timeOfDay = AppConstants.timeOfDayMorning;
@@ -188,7 +188,7 @@ class _HabitFormState extends ConsumerState<HabitForm> {
 
   Widget _buildCategorySelector() {
     final theme = Theme.of(context);
-    const categories = AppConstants.habitCategories;
+    final categories = AppConstants.habitCategories;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,35 +479,11 @@ class _HabitFormState extends ConsumerState<HabitForm> {
     Navigator.of(context).pop(habit);
   }
 
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'Mind':
-        return AppColors.habitMind;
-      case 'Body':
-        return AppColors.habitBody;
-      case 'Craft':
-        return AppColors.habitCraft;
-      case 'Discipline':
-        return AppColors.habitDiscipline;
-      default:
-        return AppColors.habitMind;
-    }
-  }
+  Color _getCategoryColor(String category) =>
+      CategoryType.fromString(category).color;
 
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Mind':
-        return Icons.psychology_outlined;
-      case 'Body':
-        return Icons.fitness_center_outlined;
-      case 'Craft':
-        return Icons.code_outlined;
-      case 'Discipline':
-        return Icons.shield_outlined;
-      default:
-        return Icons.star_outline;
-    }
-  }
+  IconData _getCategoryIcon(String category) =>
+      CategoryType.tryFromString(category)?.icon ?? Icons.star_outline;
 
   IconData _getTimeIcon(String time) {
     switch (time) {

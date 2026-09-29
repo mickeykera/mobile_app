@@ -18,6 +18,7 @@ import '../../../../app/widgets/week_strip.dart';
 import '../../../../app/widgets/stat_tile.dart';
 import '../../../../app/widgets/mini_week_strip.dart';
 import '../../../../app/widgets/app_empty_state.dart';
+import '../../../../core/constants/category_type.dart';
 import '../../../../core/constants/app_constants.dart';
 
 class HabitsScreen extends ConsumerStatefulWidget {
@@ -449,20 +450,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
     }
   }
 
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Mind':
-        return Icons.psychology_outlined;
-      case 'Body':
-        return Icons.fitness_center_outlined;
-      case 'Craft':
-        return Icons.code_outlined;
-      case 'Discipline':
-        return Icons.shield_outlined;
-      default:
-        return Icons.star_outline;
-    }
-  }
+  IconData _getCategoryIcon(String category) =>
+      CategoryType.tryFromString(category)?.icon ?? Icons.star_outline;
 }
 
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {

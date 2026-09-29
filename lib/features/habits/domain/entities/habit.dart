@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../../../../app/theme/app_colors.dart';
+import '../../../../core/constants/category_type.dart';
 import '../../../../core/utils/id_generator.dart';
 
 part 'habit.freezed.dart';
@@ -186,53 +186,17 @@ abstract class Habit with _$Habit {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  String get categoryIconName {
-    switch (category) {
-      case 'Mind':
-        return 'psychology';
-      case 'Body':
-        return 'fitness_center';
-      case 'Craft':
-        return 'code';
-      case 'Discipline':
-        return 'shield';
-      default:
-        return 'star';
-    }
-  }
-
   /// Category colour, sourced from the theme so habit cards follow the app
   /// palette. This previously hard-coded its own copy of the four category
   /// colours, which left cards on the old palette after a retheme.
-  int get categoryColorValue {
-    switch (category) {
-      case 'Mind':
-        return AppColors.habitMind.toARGB32();
-      case 'Body':
-        return AppColors.habitBody.toARGB32();
-      case 'Craft':
-        return AppColors.habitCraft.toARGB32();
-      case 'Discipline':
-        return AppColors.habitDiscipline.toARGB32();
-      default:
-        return AppColors.habitMind.toARGB32();
-    }
-  }
+  ///
+  /// The mapping now lives on [CategoryType] so the colour for a given
+  /// category is defined in exactly one place.
+  int get categoryColorValue =>
+      CategoryType.fromString(category).colorValue;
 
-  Color get categoryColor => Color(categoryColorValue);
+  Color get categoryColor => CategoryType.fromString(category).color;
 
-  IconData get categoryIcon {
-    switch (category) {
-      case 'Mind':
-        return Icons.psychology_outlined;
-      case 'Body':
-        return Icons.fitness_center_outlined;
-      case 'Craft':
-        return Icons.code_outlined;
-      case 'Discipline':
-        return Icons.shield_outlined;
-      default:
-        return Icons.star_outline;
-    }
-  }
+  IconData get categoryIcon =>
+      CategoryType.tryFromString(category)?.icon ?? Icons.star_outline;
 }

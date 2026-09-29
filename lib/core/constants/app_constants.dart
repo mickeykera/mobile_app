@@ -1,3 +1,5 @@
+import 'category_type.dart';
+
 class AppConstants {
   static const String appName = 'Ascend';
   static const String appVersion = '1.0.0';
@@ -16,16 +18,10 @@ class AppConstants {
   static const int streakFreezeCost = 1;
   static const int maxStreakFreezes = 3;
 
-  static const String habitCategoryMind = 'Mind';
-  static const String habitCategoryBody = 'Body';
-  static const String habitCategoryCraft = 'Craft';
-  static const String habitCategoryDiscipline = 'Discipline';
-  static const List<String> habitCategories = [
-    habitCategoryMind,
-    habitCategoryBody,
-    habitCategoryCraft,
-    habitCategoryDiscipline,
-  ];
+  /// `final` rather than `const` because [CategoryType.getAllTitles] builds
+  /// the list at runtime; a const list would require duplicating the four
+  /// titles here and risk them drifting out of sync with the enum.
+  static final List<String> habitCategories = CategoryType.getAllTitles();
 
   static const String timeOfDayMorning = 'Morning';
   static const String timeOfDayAfternoon = 'Afternoon';
