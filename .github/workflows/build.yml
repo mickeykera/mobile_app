@@ -91,11 +91,8 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
 
   ios:
-    name: iOS (unsigned IPA)
+    name: iOS (unsigned build)
     runs-on: macos-latest
-    # Skips cleanly until an Apple developer account, certificate and
-    # provisioning profile are configured, rather than failing every build.
-    if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -105,7 +102,43 @@ jobs:
           flutter-version: '3.47.5'
           cache: true
 
+      # An .ipa is a zip around a code signature, and Apple only issues
+      # signing certificates to paid accounts. Without one we can still
+      # prove the iOS target compiles, so this always runs and produces a
+      # .app. A .app with no signature cannot be installed on a device -
+      # it is for verifying the build, not for distribution.
+      - name: Build iOS app (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Verify the bundle was actually produced
+        run: |
+          APP=build/ios/iphoneos/Runner.app
+          if [ ! -d "$APP" ]; then
+            echo "::error::Runner.app was not produced"
+            find build/ios -maxdepth 2 -type d || true
+            exit 1
+          fi
+          echo "bundle: $APP"
+          du -sh "$APP"
+          # Fail loudly if a signature is absent, so nobody mistakes this
+          # artifact for a distributable IPA.
+          if codesign -dv "$APP" 2>&1 | grep -q 'signature'; then
+            echo "note: bundle carries a signature"
+          else
+            echo "note: bundle is UNSIGNED - not installable on a device"
+          fi
+
+      - name: Upload unsigned .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-ios-unsigned.app
+          path: build/ios/iphoneos/Runner.app
+          retention-days: 14
+
+      # The signed path only runs once an Apple developer account, a
+      # distribution certificate and a provisioning profile exist.
       - name: Decode iOS signing assets
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
         env:
           IOS_CERT_P12_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
           IOS_CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
@@ -126,15 +159,18 @@ jobs:
           cp "$RUNNER_TEMP/Runner.mobileprovision" \
             "$HOME/Library/MobileDevice/Provisioning Profiles/"
 
-      - name: Build IPA
-        run: flutter build ipa --release --no-codesign
+      - name: Build signed IPA
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+        run: flutter build ipa --release
 
       - name: Upload IPA
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release.ipa
           path: build/ios/ipa/*.ipa
 
       - name: Clean up keychain
-        if: always()
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
         run: security delete-keychain ci-keychain || true
+
