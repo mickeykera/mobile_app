@@ -4,6 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/focus_controller.dart';
 import '../../domain/entities/focus_session.dart';
+import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_theme.dart';
+import '../../../../app/theme/text_styles.dart';
+import '../../../../app/widgets/glass_card.dart';
+import '../../../../app/widgets/glow_button.dart';
+import '../../../../app/widgets/pill_chip.dart';
 
 class FocusTimer extends ConsumerStatefulWidget {
   final FocusSession? session;
@@ -32,21 +38,55 @@ class FocusTimer extends ConsumerStatefulWidget {
 }
 
 class _FocusTimerState extends ConsumerState<FocusTimer>
-    with TickerProviderStateMixin {
-  late AnimationController _animationController;
+    with SingleTickerProviderStateMixin {
+  /// Drives the slow breath around the timer ring.
+  ///
+  /// Runs only while a phase is actually counting down. A paused session is a
+  /// moment of stillness, and a ring that keeps pulsing through it tells the
+  /// user time is still moving when it is not.
+  late final AnimationController _breath;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
+    _breath = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      // ~4s each way. Faster than this reads as a heartbeat; slower stops
+      // registering as motion at all.
+      duration: const Duration(milliseconds: 4000),
     );
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncBreath();
+  }
+
+  @override
+  void didUpdateWidget(FocusTimer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncBreath();
+  }
+
+  void _syncBreath() {
+    final session = widget.session;
+    final shouldBreathe =
+        session != null && session.isActive && !session.isPaused;
+
+    if (shouldBreathe) {
+      if (!_breath.isAnimating) _breath.repeat(reverse: true);
+    } else {
+      // Settle back to neutral rather than freezing wherever the breath stopped,
+      // so pausing mid-inhale does not leave a half-grown halo.
+      _breath.stop();
+      _breath.animateTo(0, duration: AppAnimationTokens.slow);
+    }
+  }
+
+  @override
   void dispose() {
-    _animationController.dispose();
+    _breath.dispose();
     super.dispose();
   }
 
@@ -66,8 +106,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final session = widget.session;
     final progress = ref.watch(focusProgressProvider);
 
@@ -85,71 +124,94 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _buildPhaseIndicator(context, phaseLabel, phaseIcon, phaseColor),
-        const SizedBox(height: 32),
+        const SizedBox(height: AppSpacingTokens.xl),
         _buildTimerCircle(context, progress, phaseColor, session),
-        const SizedBox(height: 32),
+        const SizedBox(height: AppSpacingTokens.xl),
         _buildSessionInfo(context, session),
-        const SizedBox(height: 32),
+        const SizedBox(height: AppSpacingTokens.xl),
         _buildControls(context, session, phaseColor),
       ],
     ));
   }
 
   Widget _buildSetupView(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final state = ref.watch(focusControllerProvider);
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Container(
-          width: 160,
-          height: 160,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            shape: BoxShape.circle,
+        // A breathing halo rather than a solid disc: this is the resting state,
+        // and it should invite rather than demand attention.
+        _BreathingHalo(
+          controller: _breath,
+          child: SizedBox(
+            width: 150,
+            height: 150,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colorScheme.primary.withValues(alpha: 0.22),
+                        AppColors.radiantViolet.withValues(alpha: 0.12),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.center_focus_strong_rounded,
+                  size: 66,
+                  color: colorScheme.primary,
+                ),
+              ],
+            ),
           ),
-          child: Icon(
-            Icons.center_focus_strong_rounded,
-            size: 80,
-            color: colorScheme.onPrimaryContainer,
-          ),
-        ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
-        const SizedBox(height: 32),
-        Text(
+        ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+        const SizedBox(height: AppSpacingTokens.xl),
+        const Text(
           'Ready to Focus?',
-          style: theme.textTheme.headlineMedium
-              ?.copyWith(fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+          style: AppTextStyles.headlineSmall,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacingTokens.sm),
         Text(
           'Choose a mode and duration to start your deep work session',
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: colorScheme.onSurfaceVariant),
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: AppSpacingTokens.lg),
         _buildModeSelector(context),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacingTokens.lg),
         _buildDurationControls(context),
-        const SizedBox(height: 32),
-        FilledButton.icon(
+        const SizedBox(height: AppSpacingTokens.xl),
+        GlowButton(
+          label: 'Start Session',
+          icon: Icons.play_arrow_rounded,
+          accent: colorScheme.primary,
           onPressed: widget.onStart,
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Start Session'),
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
         ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
         if (state.selectedHabitId != null || state.projectName != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacingTokens.sm),
           TextButton.icon(
             onPressed: widget.onSettings,
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(Icons.settings_outlined, size: 18),
             label: const Text('Session Settings'),
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ],
@@ -157,37 +219,36 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
   }
 
   Widget _buildModeSelector(BuildContext context) {
-    final theme = Theme.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
     final state = ref.watch(focusControllerProvider);
-    final modes = ['Pomodoro', 'Custom', 'Stopwatch'];
+    const modes = ['Pomodoro', 'Custom', 'Stopwatch'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Mode',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: modes.map((mode) {
-            final isSelected = state.selectedMode == mode;
-            return FilterChip(
-              label: Text(mode),
-              selected: isSelected,
-              onSelected: (_) =>
-                  ref.read(focusControllerProvider.notifier).setMode(mode),
-              selectedColor: theme.colorScheme.primaryContainer,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-            );
-          }).toList(),
+        const Text('Mode', style: AppTextStyles.labelLarge),
+        const SizedBox(height: AppSpacingTokens.sm),
+        // Centred rather than a full-width row: the setup column is centred, and
+        // a left-aligned pill row under a centred heading read as misaligned.
+        Center(
+          child: GlassPillRow(
+            pills: [
+              for (final mode in modes)
+                GlassPill(
+                  label: mode,
+                  selected: state.selectedMode == mode,
+                  icon: switch (mode) {
+                    'Pomodoro' => Icons.timer_outlined,
+                    'Custom' => Icons.tune_rounded,
+                    _ => Icons.hourglass_bottom_rounded,
+                  },
+                  accent: colorScheme.primary,
+                  onTap: () => ref
+                      .read(focusControllerProvider.notifier)
+                      .setMode(mode),
+                ),
+            ],
+          ),
         ),
       ],
     );
@@ -212,7 +273,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
                     (v) => ref
                         .read(focusControllerProvider.notifier)
                         .setWorkDuration(v))),
-            const SizedBox(width: 16),
+            const SizedBox(width: AppSpacingTokens.md),
             Expanded(
                 child: _buildDurationField(
                     context,
@@ -224,7 +285,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
           ],
         ),
         if (state.selectedMode == 'Pomodoro') ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacingTokens.md),
           Row(
             children: [
               Expanded(
@@ -235,7 +296,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
                       (v) => ref
                           .read(focusControllerProvider.notifier)
                           .setLongBreakDuration(v))),
-              const SizedBox(width: 16),
+              const SizedBox(width: AppSpacingTokens.md),
               Expanded(
                   child: _buildDurationField(
                       context,
@@ -260,22 +321,33 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 4),
+        Text(
+          label,
+          style: AppTextStyles.labelMedium.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacingTokens.xs + 2),
         TextFormField(
           initialValue: value.toString(),
           decoration: InputDecoration(
-            suffixText: isMinutes ? ' min' : '',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            suffixText: isMinutes ? 'min' : '',
+            // No visible border: the field sits in a darker inset well so it
+            // reads as a slot the value drops into, not a form control stamped
+            // on top of the page.
+            filled: true,
+            fillColor: AppColors.insetFill(theme.colorScheme, opacity: 0.6),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacingTokens.md,
+              vertical: AppSpacingTokens.sm + 4,
+            ),
           ),
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600),
+          style: AppTextStyles.titleMedium.copyWith(
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onSurface,
+          ),
           onChanged: (v) => onChanged(int.tryParse(v) ?? value),
         ),
       ],
@@ -287,37 +359,51 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
     final theme = Theme.of(context);
     final session = widget.session!;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
+    // A pill rather than a bare icon + two lines: the phase is the single most
+    // important piece of state on the screen, and enclosing it in glass gives it
+    // a boundary you can find without reading the text.
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacingTokens.lg,
+        vertical: AppSpacingTokens.sm + 2,
+      ),
+      radius: AppRadiusTokens.full,
+      tint: color,
+      tintOpacity: 0.14,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: color, blurRadius: 10, spreadRadius: -2),
+              ],
+            ),
+            child: Icon(icon, color: color, size: 22),
           ),
-          child: Icon(icon, color: color, size: 28),
-        ),
-        const SizedBox(width: 16),
-        Column(
-          children: [
-            Text(
-              label.toUpperCase(),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: color,
-                letterSpacing: 2,
-                fontWeight: FontWeight.w600,
+          const SizedBox(width: AppSpacingTokens.md),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: AppTextStyles.overline.copyWith(color: color),
               ),
-            ),
-            Text(
-              session.isBreak ? 'Recharge' : 'Deep Work',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ],
-    );
+              Text(
+                session.isBreak ? 'Recharge' : 'Deep Work',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: AppAnimationTokens.medium).slideY(begin: -0.1, end: 0);
   }
 
   Widget _buildTimerCircle(BuildContext context, double progress, Color color,
@@ -326,56 +412,118 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
     final formattedTime =
         session.isBreak ? session.formattedRemaining : session.formattedElapsed;
 
-    return SizedBox(
-      width: 280,
-      height: 280,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(
-            width: 280,
-            height: 280,
-            child: CircularProgressIndicator(
-              value: progress,
-              strokeWidth: 12,
-              backgroundColor: color.withValues(alpha: 0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-              strokeCap: StrokeCap.round,
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                formattedTime,
-                style: theme.textTheme.displayMedium?.copyWith(
-                  fontWeight: FontWeight.w300,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                session.isBreak ? 'Time to recharge' : 'Stay focused',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+    // The halo breathes outside the ring so the progress arc itself stays a
+    // precise instrument - scaling the ring would make the arc harder to read at
+    // a glance, which is the one job it has.
+    return AnimatedBuilder(
+      animation: _breath,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_breath.value);
+        final scale = 1 + t * 0.035;
+        final glow = 0.35 + t * 0.3;
+
+        return Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: glow * 0.5),
+                blurRadius: 40 + t * 26,
+                spreadRadius: t * 6,
               ),
             ],
-          ).animate().fadeIn(duration: 300.ms),
-        ],
+          ),
+          // Named so tests can sample the breath. There are several `Transform`s
+          // in this subtree (the entrance scale, the icon swaps) and the
+          // breathing one is the only one whose scale is neither 1 nor constant.
+          child: Transform.scale(
+            key: const ValueKey('focus-breath'),
+            scale: scale,
+            child: child,
+          ),
+        );
+      },
+      child: SizedBox(
+        width: 280,
+        height: 280,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // A wide, faint outer ring behind the arc: reads as the halo of the
+            // light source rather than as a second progress indicator, because
+            // it never changes value.
+            SizedBox(
+              width: 268,
+              height: 268,
+              child: CircularProgressIndicator(
+                value: 1,
+                strokeWidth: 1,
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  color.withValues(alpha: 0.18),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 268,
+              height: 268,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: progress),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, _) => CircularProgressIndicator(
+                  value: value,
+                  strokeWidth: 12,
+                  strokeCap: StrokeCap.round,
+                  backgroundColor: color.withValues(alpha: 0.12),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    // A gradient that rotates around the ring would be prettier,
+                    // but a SweepGradient on a progress indicator jumps at the
+                    // wrap point and reads as a glitch. A two-stop gradient along
+                    // the arc stays smooth.
+                    Color.lerp(color, AppColors.radiantViolet, 0.45) ??
+                        color,
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: AppAnimationTokens.fast,
+                  child: Text(
+                    formattedTime,
+                    key: ValueKey(formattedTime),
+                    style: AppTextStyles.displaySmall.copyWith(
+                      fontWeight: FontWeight.w300,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacingTokens.sm),
+                Text(
+                  session.isBreak ? 'Time to recharge' : 'Stay focused',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(duration: 300.ms),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSessionInfo(BuildContext context, FocusSession session) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacingTokens.md,
+        vertical: AppSpacingTokens.lg,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -411,18 +559,23 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
     final theme = Theme.of(context);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 4),
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: AppSpacingTokens.xs + 2),
         Text(
           value,
-          style: theme.textTheme.titleLarge
-              ?.copyWith(fontWeight: FontWeight.w700, color: color),
+          style: AppTextStyles.metricMedium.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         Text(
           label,
-          style: theme.textTheme.labelSmall
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          textAlign: TextAlign.center,
+          style: AppTextStyles.labelSmall.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -440,64 +593,123 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
         children: [
           OutlinedButton.icon(
             onPressed: widget.onDiscard,
-            icon: const Icon(Icons.close_rounded),
+            icon: const Icon(Icons.close_rounded, size: 18),
             label: const Text('Discard'),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               foregroundColor: theme.colorScheme.error,
-              side: BorderSide(color: theme.colorScheme.error),
+              side: BorderSide(
+                color: theme.colorScheme.error.withValues(alpha: 0.6),
+              ),
             ),
           ),
-          const SizedBox(width: 16),
-          FilledButton.icon(
+          const SizedBox(width: AppSpacingTokens.md),
+          OutlinedButton.icon(
             onPressed: widget.onEnd,
-            icon: const Icon(Icons.flag_rounded),
+            icon: const Icon(Icons.flag_rounded, size: 18),
             label: const Text('End Session'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              backgroundColor: theme.colorScheme.tertiary,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: theme.colorScheme.tertiary,
+              side: BorderSide(
+                color: theme.colorScheme.tertiary.withValues(alpha: 0.6),
+              ),
             ),
           ),
         ],
       );
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
-        if (isPaused)
-          FilledButton.icon(
-            onPressed: widget.onResume,
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('Resume'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              backgroundColor: phaseColor,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isPaused)
+              GlowButton(
+                label: 'Resume',
+                icon: Icons.play_arrow_rounded,
+                accent: phaseColor,
+                onPressed: widget.onResume,
+                height: 52,
+              ).animate().scale(duration: 200.ms, curve: Curves.elasticOut)
+            else
+              OutlinedButton.icon(
+                onPressed: widget.onPause,
+                icon: const Icon(Icons.pause_rounded, size: 20),
+                label: const Text('Pause'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacingTokens.xl,
+                    vertical: AppSpacingTokens.lg,
+                  ),
+                  foregroundColor: phaseColor,
+                  side: BorderSide(color: phaseColor.withValues(alpha: 0.5)),
+                  shape: const StadiumBorder(),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacingTokens.md),
+        // Skipping to the next phase is the primary action during a session, so
+        // it gets the full-width glowing pill and the pause control stays
+        // secondary. Sized in a constrained box so a very long localised label
+        // cannot make the glow shadow spill across the whole screen.
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: SizedBox(
+            width: double.infinity,
+            child: GlowButton(
+              label: session.isBreak ? 'Start Focus' : 'Start Break',
+              icon: session.isBreak
+                  ? Icons.check_rounded
+                  : Icons.forward_rounded,
+              accent: session.isBreak
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.tertiary,
+              onPressed: widget.onCompletePhase,
+              height: 54,
             ),
-          ).animate().scale(duration: 200.ms, curve: Curves.elasticOut)
-        else
-          OutlinedButton.icon(
-            onPressed: widget.onPause,
-            icon: const Icon(Icons.pause_rounded),
-            label: const Text('Pause'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            ),
-          ),
-        const SizedBox(width: 16),
-        FilledButton.icon(
-          onPressed: widget.onCompletePhase,
-          icon: Icon(
-              session.isBreak ? Icons.check_rounded : Icons.forward_rounded),
-          label: Text(session.isBreak ? 'Start Focus' : 'Start Break'),
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            backgroundColor: session.isBreak
-                ? theme.colorScheme.primary
-                : theme.colorScheme.tertiary,
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A soft glow that swells and fades around [child] on [controller].
+///
+/// The scale and the shadow are driven from the same value so the two can never
+/// drift out of phase, which is what makes a separate "pulse in, glow out"
+/// implementation look seasick.
+class _BreathingHalo extends StatelessWidget {
+  final AnimationController controller;
+  final Widget child;
+
+  const _BreathingHalo({required this.controller, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(controller.value);
+        return Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.18 + t * 0.18),
+                blurRadius: 30 + t * 24,
+                spreadRadius: t * 4,
+              ),
+            ],
+          ),
+          child: Transform.scale(scale: 1 + t * 0.04, child: child),
+        );
+      },
+      child: child,
     );
   }
 }

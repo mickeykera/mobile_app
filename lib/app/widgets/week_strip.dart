@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
-
 import '../theme/app_theme.dart';
+import '../theme/text_styles.dart';
+import 'progress_ring.dart';
 
 /// How a single day in a [WeekStrip] should be drawn.
 enum WeekDayState {
@@ -19,137 +20,186 @@ enum WeekDayState {
   upcoming,
 }
 
-/// A Monday-to-Sunday row of day markers.
+/// Fraction of the ring each [WeekDayState] fills, when the caller does not
+/// supply real numbers.
+double _stateFraction(WeekDayState state) {
+  switch (state) {
+    case WeekDayState.complete:
+      return 1.0;
+    case WeekDayState.partial:
+      return 0.5;
+    case WeekDayState.missed:
+    case WeekDayState.upcoming:
+      return 0.0;
+  }
+}
+
+/// A floating week chain: seven completion rings in a glass pill.
 ///
-/// This is the pattern Streaks, Trophy and Fabulous all use: a glanceable
-/// "chain" of the last seven days that makes a broken streak feel visible
-/// without opening a calendar.
+/// This is the pattern Streaks, Trophy, Forest and Fabulous all use - a
+/// glanceable "chain" of the last seven days that makes a broken streak visible
+/// without opening a calendar. It is drawn as a single floating pill rather
+/// than seven loose squares so it reads as one object that can be tapped, and
+/// so the rings sit on glass instead of on the page.
 class WeekStrip extends StatelessWidget {
   /// Seven entries, Monday first.
   final List<WeekDayState> days;
   final int? todayIndex;
   final Color accent;
+
+  /// Diameter of each ring. The pill's height follows from this.
   final double cellSize;
+
+  /// Per-day fill fractions in `0..1`, in the same order as [days]. Lets a
+  /// caller show real counts (3 of 5 habits) instead of the coarse state. Falls
+  /// back to the value implied by [WeekDayState].
+  final List<double>? progress;
 
   const WeekStrip({
     super.key,
     required this.days,
     required this.accent,
     this.todayIndex,
-    this.cellSize = 34,
+    this.cellSize = 38,
+    this.progress,
   });
 
   static const List<String> _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final count = days.length.clamp(0, 7);
 
-    return Row(
-      children: List<Widget>.generate(days.length.clamp(0, 7), (index) {
-        final isToday = todayIndex == index;
-        final label = _labels[index % 7];
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacingTokens.md,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.cardFill(
+          Theme.of(context).colorScheme,
+          opacity: 0.55,
+        ),
+        borderRadius: BorderRadius.circular(AppRadiusTokens.full),
+        border: Border.all(
+          color: AppColors.hairline(Theme.of(context).colorScheme),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List<Widget>.generate(count, (index) {
+          final isToday = todayIndex == index;
 
-        return Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: isToday
-                      ? theme.colorScheme.onSurface
-                      : theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.7),
-                  fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: AppSpacingTokens.xs),
-              _DayCell(
-                state: days[index],
-                isToday: isToday,
-                accent: accent,
-                size: cellSize,
-              ),
-            ],
-          ),
-        );
-      }),
+          return _DayCell(
+            state: days[index],
+            fraction: progress != null && index < progress!.length
+                ? progress![index].clamp(0.0, 1.0)
+                : _stateFraction(days[index]),
+            isToday: isToday,
+            accent: accent,
+            size: cellSize,
+            label: _labels[index % 7],
+          );
+        }),
+      ),
     );
   }
 }
 
 class _DayCell extends StatelessWidget {
   final WeekDayState state;
+  final double fraction;
   final bool isToday;
   final Color accent;
   final double size;
+  final String label;
 
   const _DayCell({
     required this.state,
+    required this.fraction,
     required this.isToday,
     required this.accent,
     required this.size,
+    required this.label,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final outline = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.35);
+    final scheme = theme.colorScheme;
+    final isFuture = state == WeekDayState.upcoming;
 
-    final Color fill;
-    final Color border;
-    final double borderWidth;
+    // A missed day is a real absence, so it keeps a faint ring. An upcoming day
+    // is not an absence at all and gets no ring - otherwise a Monday morning
+    // reads as seven failures.
+    final ringColor = switch (state) {
+      WeekDayState.complete => accent,
+      WeekDayState.partial => accent,
+      WeekDayState.missed => scheme.onSurfaceVariant.withValues(alpha: 0.4),
+      WeekDayState.upcoming => scheme.onSurfaceVariant.withValues(alpha: 0.18),
+    };
 
-    switch (state) {
-      case WeekDayState.complete:
-        fill = accent;
-        border = accent;
-        borderWidth = 2;
-      case WeekDayState.partial:
-        fill = accent.withValues(alpha: 0.28);
-        border = accent;
-        borderWidth = 2;
-      case WeekDayState.missed:
-        fill = Colors.transparent;
-        border = outline;
-        borderWidth = 1.5;
-      case WeekDayState.upcoming:
-        fill = Colors.transparent;
-        border = outline.withValues(alpha: 0.5);
-        borderWidth = 1.5;
-    }
-
-    return AnimatedContainer(
-      duration: AppAnimationTokens.medium,
-      curve: Curves.easeOutCubic,
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(AppRadiusTokens.md),
-        border: Border.all(color: border, width: borderWidth),
-      ),
-      child: state == WeekDayState.complete
-          ? Icon(
-              Icons.check_rounded,
-              size: size * 0.55,
-              // Same reasoning as the habit card tick: a fixed white tick is
-              // too light on the mint and amber accents.
-              color: AppColors.onColorFor(fill, Theme.of(context).colorScheme),
-            )
-          : state == WeekDayState.partial
-              ? Center(
-                  child: Container(
-                    width: size * 0.22,
-                    height: size * 0.22,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      shape: BoxShape.circle,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: AppTextStyles.labelSmall.copyWith(
+            fontSize: 10,
+            color: isToday
+                ? scheme.onSurface
+                : scheme.onSurfaceVariant.withValues(alpha: 0.65),
+            fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        AnimatedContainer(
+          duration: AppAnimationTokens.medium,
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            // Today is called out with a halo rather than a heavier border, so
+            // "today" is distinguishable from "complete" at a glance.
+            boxShadow: isToday
+                ? [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      spreadRadius: 1,
                     ),
-                  ),
+                  ]
+                : null,
+          ),
+          child: isFuture
+              ? SizedBox(
+                  width: size - 6,
+                  height: size - 6,
                 )
-              : null,
+              : DayRing(
+                  value: fraction,
+                  color: ringColor,
+                  size: size - 6,
+                  strokeWidth: 3,
+                  child: state == WeekDayState.complete
+                      ? Icon(
+                          Icons.check_rounded,
+                          size: (size - 6) * 0.52,
+                          color: AppColors.onColorFor(ringColor, scheme),
+                        )
+                      : state == WeekDayState.partial
+                          ? Container(
+                              width: (size - 6) * 0.24,
+                              height: (size - 6) * 0.24,
+                              decoration: BoxDecoration(
+                                color: accent,
+                                shape: BoxShape.circle,
+                              ),
+                            )
+                          : null,
+                ),
+        ),
+      ],
     );
   }
 }

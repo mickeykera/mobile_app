@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
 import 'week_strip.dart';
 
 /// Derives the Monday-first [WeekDayState] list for the week containing
@@ -49,11 +50,14 @@ List<WeekDayState> deriveWeekStates({
   });
 }
 
-/// A compact row of seven squares shown inside a habit row.
+/// A compact row of seven tiles shown inside a habit row.
 ///
-/// Each square is one day of the current week: filled means kept, outlined
-/// means missed, hollow means still to come. It is the small "chain" that makes
+/// Each tile is one day of the current week: filled means kept, outlined means
+/// missed, ghosted means still to come. It is the small "chain" that makes
 /// consistency visible without leaving the list.
+///
+/// Drawn as rounded tiles with a real gap rather than squares butted together,
+/// so seven of them read as seven days instead of a barcode.
 class MiniWeekStrip extends StatelessWidget {
   final List<WeekDayState> days;
   final Color accent;
@@ -69,33 +73,39 @@ class MiniWeekStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final empty = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3);
+    final empty = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.25);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: days.take(7).map((state) {
-        final Color fill;
-        switch (state) {
-          case WeekDayState.complete:
-            fill = accent;
-          case WeekDayState.partial:
-            fill = accent.withValues(alpha: 0.35);
-          case WeekDayState.missed:
-            fill = Colors.transparent;
-          case WeekDayState.upcoming:
-            fill = empty;
-        }
+        final (fill, border) = switch (state) {
+          WeekDayState.complete => (accent, accent),
+          WeekDayState.partial => (accent.withValues(alpha: 0.3), accent),
+          WeekDayState.missed => (Colors.transparent, empty),
+          WeekDayState.upcoming => (Colors.transparent, Colors.transparent),
+        };
 
         return Padding(
           padding: const EdgeInsets.only(right: 4),
-          child: Container(
+          child: AnimatedContainer(
+            duration: AppAnimationTokens.medium,
+            curve: Curves.easeOutCubic,
             width: size,
             height: size,
             decoration: BoxDecoration(
               color: fill,
-              borderRadius: BorderRadius.circular(3),
-              border: state == WeekDayState.missed
-                  ? Border.all(color: empty, width: 1)
+              borderRadius: BorderRadius.circular(size * 0.34),
+              border: border == Colors.transparent
+                  ? null
+                  : Border.all(color: border, width: 1),
+              boxShadow: state == WeekDayState.complete
+                  ? [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.4),
+                        blurRadius: 5,
+                        spreadRadius: -1,
+                      ),
+                    ]
                   : null,
             ),
           ),

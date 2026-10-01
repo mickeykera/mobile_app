@@ -1,9 +1,20 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/focus_controller.dart';
 import '../widgets/focus_timer.dart';
 import '../../domain/entities/focus_session.dart';
+import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_theme.dart';
+import '../../../../app/theme/text_styles.dart';
+import '../../../../app/widgets/glass_card.dart';
+import '../../../../app/widgets/glow_button.dart';
+import '../../../../app/widgets/pressable.dart';
+import '../../../../app/widgets/pill_chip.dart';
 
 class FocusScreen extends ConsumerStatefulWidget {
   const FocusScreen({super.key});
@@ -14,6 +25,17 @@ class FocusScreen extends ConsumerStatefulWidget {
 
 class _FocusScreenState extends ConsumerState<FocusScreen>
     with WidgetsBindingObserver {
+  /// Bottom clearance for the floating nav bar, which draws over this screen.
+  static const double _navBarClearance = 96;
+
+  /// The pending one-second tick, held so it can be cancelled.
+  ///
+  /// This used to be a `Future.doWhile` chain with no handle on it, which left
+  /// one timer in flight after every visit to the tab: leaving and coming back
+  /// started a second ticker, so the countdown advanced at double speed and the
+  /// controller ticked twice per second for the rest of the session.
+  Timer? _ticker;
+
   @override
   void initState() {
     super.initState();
@@ -23,6 +45,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
 
   @override
   void dispose() {
+    _ticker?.cancel();
+    _ticker = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -35,12 +59,10 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
   }
 
   void _startTicker() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) {
-        ref.read(focusControllerProvider.notifier).tick();
-      }
-      return mounted;
+    _ticker = Timer(const Duration(seconds: 1), () {
+      if (!mounted) return;
+      ref.read(focusControllerProvider.notifier).tick();
+      _startTicker();
     });
   }
 
@@ -50,32 +72,58 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
     final activeSession = controller.activeSession;
 
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 24),
-              Expanded(
-                child: FocusTimer(
-                  session: activeSession,
-                  onStart: _startSession,
-                  onPause: _pauseSession,
-                  onResume: _resumeSession,
-                  onCompletePhase: _completePhase,
-                  onEnd: _showEndSessionDialog,
-                  onDiscard: _discardSession,
-                  onSettings: _showSettings,
-                ),
+      body: Stack(
+        children: [
+          // One soft bloom behind the whole screen. The timer ring provides its
+          // own light; this only keeps the page from reading as flat black.
+          const Positioned(
+            top: -160,
+            right: -80,
+            child: SizedBox(
+              width: 420,
+              height: 420,
+              child: AuroraBackdrop(
+                accentA: AppColors.neonCyan,
+                accentB: AppColors.radiantViolet,
+                opacity: 0.14,
               ),
-              if (activeSession != null && !activeSession.isActive) ...[
-                const SizedBox(height: 24),
-                _buildRecentSessions(context),
-              ],
-            ],
+            ),
           ),
-        ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacingTokens.gutter,
+                AppSpacingTokens.gutter,
+                AppSpacingTokens.gutter,
+                // The nav bar floats over the page, so the focus controls need
+                // this much clearance to stay tappable above it.
+                _navBarClearance,
+              ),
+              child: Column(
+                children: [
+                  _buildHeader(context),
+                  const SizedBox(height: AppSpacingTokens.md),
+                  Expanded(
+                    child: FocusTimer(
+                      session: activeSession,
+                      onStart: _startSession,
+                      onPause: _pauseSession,
+                      onResume: _resumeSession,
+                      onCompletePhase: _completePhase,
+                      onEnd: _showEndSessionDialog,
+                      onDiscard: _discardSession,
+                      onSettings: _showSettings,
+                    ),
+                  ),
+                  if (activeSession != null && !activeSession.isActive) ...[
+                    const SizedBox(height: AppSpacingTokens.md),
+                    _buildRecentSessions(context),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -91,24 +139,32 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Deep Work',
-                style: theme.textTheme.headlineMedium
-                    ?.copyWith(fontWeight: FontWeight.w700),
+              ShaderMask(
+                // Gradient headline, so the title is lit rather than flat white.
+                shaderCallback: AppGradients.action(colorScheme.primary).createShader,
+                child: Text(
+                  'Deep Work',
+                  style: AppTextStyles.headlineMedium.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
               ),
+              const SizedBox(height: 2),
               Text(
                 _getGreeting(),
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: colorScheme.onSurfaceVariant),
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
         ),
         if (state.activeSession == null)
-          IconButton(
-            onPressed: _showSettings,
-            icon: const Icon(Icons.settings_outlined),
+          GlowIconButton(
+            icon: Icons.tune_rounded,
+            accent: colorScheme.primary,
             tooltip: 'Session Settings',
+            onPressed: _showSettings,
           ),
       ],
     );
@@ -158,49 +214,31 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('How focused were you?',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 16),
+            const Text('How focused were you?', style: AppTextStyles.titleSmall),
+            const SizedBox(height: AppSpacingTokens.md),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(5, (index) {
                 final rating = index + 1;
-                final isSelected = focusRating == rating;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => focusRating = rating);
-                  },
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: Theme.of(context).colorScheme.outline),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '$rating',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: isSelected
-                                  ? Theme.of(context).colorScheme.onPrimary
-                                  : Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ),
-                  ),
+                final color = AppColors.ratingScaleColor(
+                  Theme.of(context).colorScheme,
+                  rating,
+                );
+
+                // Each step has its own colour, so the row reads as a scale you
+                // move along rather than five interchangeable buttons.
+                return _RatingDot(
+                  rating: rating,
+                  color: color,
+                  selected: focusRating == rating,
+                  onTap: () => setState(() => focusRating = rating),
                 );
               }),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacingTokens.lg),
             TextField(
               controller: notesController,
+              style: AppTextStyles.bodyMedium,
               decoration: const InputDecoration(
                 labelText: 'Reflection Notes (optional)',
                 hintText: 'What did you accomplish? Any insights?',
@@ -279,7 +317,6 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
   }
 
   Widget _buildRecentSessions(BuildContext context) {
-    final theme = Theme.of(context);
     final recentSessions = ref.watch(focusControllerProvider).recentSessions;
 
     if (recentSessions.isEmpty) return const SizedBox.shrink();
@@ -287,20 +324,21 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Recent Sessions',
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 16),
+        const Text('Recent Sessions', style: AppTextStyles.titleMedium),
+        const SizedBox(height: AppSpacingTokens.sm + 2),
         SizedBox(
-          height: 120,
+          height: 132,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             itemCount: recentSessions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 16),
-            itemBuilder: (context, index) {
-              final session = recentSessions[index];
-              return _SessionCard(session: session);
-            },
+            separatorBuilder: (_, __) => const SizedBox(width: AppSpacingTokens.sm),
+            itemBuilder: (context, index) => _SessionCard(
+              session: recentSessions[index],
+            )
+                .animate()
+                .fadeIn(duration: AppAnimationTokens.slow)
+                .slideX(begin: 0.12, end: 0, curve: Curves.easeOutCubic),
           ),
         ),
       ],
@@ -311,52 +349,75 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
 class _SessionSettingsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Scrollable, and only as tall as it needs to be. The sheet holds two rows of
+    // duration fields plus two text fields; on a short screen, or with the text
+    // scale turned up, that is more than the viewport, and a non-scrolling
+    // column just overflows.
+    return ConstrainedBox(
+      // Outside the scroll view, not inside it. A `maxHeight` on an inner
+      // ConstrainedBox clamps the Column's own constraints, so the column still
+      // overflows; the cap has to bound the scroll viewport instead.
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+      ),
+      child: SingleChildScrollView(child: _buildSheetBody(context, ref)),
+    );
+  }
+
+  Widget _buildSheetBody(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadiusTokens.sheetTop),
       ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardFill(theme.colorScheme, opacity: 0.9),
+            border: Border(
+              top: BorderSide(color: AppColors.hairline(theme.colorScheme)),
+            ),
+          ),
+          padding: const EdgeInsets.all(AppSpacingTokens.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: AppSpacingTokens.lg),
+              const Text('Session Settings', style: AppTextStyles.titleLarge),
+              const SizedBox(height: AppSpacingTokens.lg),
+              _buildModeSelector(context, ref),
+              const SizedBox(height: AppSpacingTokens.lg),
+              _buildDurationControls(context, ref),
+              const SizedBox(height: AppSpacingTokens.lg),
+              _buildHabitLink(context, ref),
+              const SizedBox(height: AppSpacingTokens.lg),
+              _buildProjectName(context, ref),
+              const SizedBox(height: AppSpacingTokens.xl),
+              GlowButton(
+                label: 'Done',
+                accent: theme.colorScheme.primary,
+                width: double.infinity,
+                height: 52,
+                onPressed: () => Navigator.pop(context),
+              ),
+              const SizedBox(height: AppSpacingTokens.sm),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text('Session Settings',
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 24),
-          _buildModeSelector(context, ref),
-          const SizedBox(height: 24),
-          _buildDurationControls(context, ref),
-          const SizedBox(height: 24),
-          _buildHabitLink(context, ref),
-          const SizedBox(height: 24),
-          _buildProjectName(context, ref),
-          const SizedBox(height: 32),
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-            ),
-            child: const Text('Done'),
-          ),
-          const SizedBox(height: 16),
-        ],
+        ),
       ),
     );
   }
@@ -369,28 +430,18 @@ class _SessionSettingsSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Mode',
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
+        const Text('Mode', style: AppTextStyles.titleSmall),
+        const SizedBox(height: AppSpacingTokens.sm),
         Wrap(
-          spacing: 8,
+          spacing: AppSpacingTokens.sm,
+          runSpacing: AppSpacingTokens.sm,
           children: modes.map((mode) {
-            final isSelected = state.selectedMode == mode;
-            return FilterChip(
-              label: Text(mode),
-              selected: isSelected,
-              onSelected: (_) =>
+            return GlassPill(
+              label: mode,
+              selected: state.selectedMode == mode,
+              accent: theme.colorScheme.primary,
+              onTap: () =>
                   ref.read(focusControllerProvider.notifier).setMode(mode),
-              selectedColor: theme.colorScheme.primaryContainer,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
             );
           }).toList(),
         ),
@@ -399,7 +450,6 @@ class _SessionSettingsSheet extends ConsumerWidget {
   }
 
   Widget _buildDurationControls(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final state = ref.watch(focusControllerProvider);
 
     if (state.selectedMode == 'Stopwatch') {
@@ -409,10 +459,8 @@ class _SessionSettingsSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Durations',
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 16),
+        const Text('Durations', style: AppTextStyles.titleSmall),
+        const SizedBox(height: AppSpacingTokens.md),
         Row(
           children: [
             Expanded(
@@ -460,16 +508,13 @@ class _SessionSettingsSheet extends ConsumerWidget {
   }
 
   Widget _buildHabitLink(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final state = ref.watch(focusControllerProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Link to Habit (optional)',
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
+        const Text('Link to Habit (optional)', style: AppTextStyles.titleSmall),
+        const SizedBox(height: AppSpacingTokens.sm),
         TextFormField(
           initialValue: state.selectedHabitId,
           decoration: const InputDecoration(
@@ -486,16 +531,13 @@ class _SessionSettingsSheet extends ConsumerWidget {
   }
 
   Widget _buildProjectName(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final state = ref.watch(focusControllerProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Project Name (optional)',
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
+        const Text('Project Name (optional)', style: AppTextStyles.titleSmall),
+        const SizedBox(height: AppSpacingTokens.sm),
         TextFormField(
           initialValue: state.projectName,
           decoration: const InputDecoration(
@@ -532,22 +574,30 @@ class _DurationField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 4),
+        Text(
+          label,
+          style: AppTextStyles.labelMedium.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacingTokens.xs + 2),
         TextFormField(
           initialValue: value.toString(),
           decoration: InputDecoration(
-            suffixText: isMinutes ? ' min' : '',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            suffixText: isMinutes ? 'min' : '',
+            filled: true,
+            fillColor: AppColors.insetFill(theme.colorScheme, opacity: 0.6),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacingTokens.md,
+              vertical: AppSpacingTokens.sm + 4,
+            ),
           ),
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600),
+          style: AppTextStyles.titleMedium.copyWith(
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onSurface,
+          ),
           onChanged: (v) => onChanged(int.tryParse(v) ?? value),
         ),
       ],
@@ -566,67 +616,136 @@ class _SessionCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isWork = session.mode != 'Stopwatch';
 
-    return Container(
+    final accent = isWork ? colorScheme.primary : colorScheme.tertiary;
+
+    return SizedBox(
       width: 200,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: (isWork ? colorScheme.primary : colorScheme.tertiary)
-                      .withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
+      child: GlassCard(
+        tint: accent,
+        tintOpacity: 0.09,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(AppRadiusTokens.sm),
+                  ),
+                  child: Icon(
+                    isWork
+                        ? Icons.center_focus_strong_rounded
+                        : Icons.timer_outlined,
+                    size: 16,
+                    color: accent,
+                  ),
                 ),
-                child: Icon(
-                  isWork
-                      ? Icons.center_focus_strong_rounded
-                      : Icons.timer_outlined,
-                  size: 16,
-                  color: isWork ? colorScheme.primary : colorScheme.tertiary,
+                const Spacer(),
+                Text(
+                  session.mode,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              Text(
-                session.mode,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${session.totalWorkMinutes} min',
-            style: theme.textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          Text(
-            '${session.completedSessions} sessions • ${session.formattedElapsed}',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: colorScheme.onSurfaceVariant),
-          ),
-          if (session.projectName != null) ...[
-            const SizedBox(height: 4),
+              ],
+            ),
+            const SizedBox(height: AppSpacingTokens.sm + 2),
             Text(
-              session.projectName!,
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: colorScheme.primary),
+              '${session.totalWorkMinutes} min',
+              style: AppTextStyles.titleLarge.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              '${session.completedSessions} sessions • ${session.formattedElapsed}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
+            if (session.projectName != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                session.projectName!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.labelMedium.copyWith(color: accent),
+              ),
+            ],
           ],
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One step of the 1-5 focus-rating scale.
+///
+/// Unselected steps show their own scale colour as a tinted well rather than a
+/// flat grey, so the whole row reads as a gradient the user is choosing a point
+/// on. The selected step lights up and grows.
+class _RatingDot extends StatelessWidget {
+  final int rating;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _RatingDot({
+    required this.rating,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      selected: selected,
+      label: 'Focus rating $rating',
+      child: Pressable(
+        onTap: onTap,
+        pressScale: 0.9,
+        semanticButton: false,
+        child: AnimatedContainer(
+          duration: AppAnimationTokens.medium,
+          curve: Curves.easeOutCubic,
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: selected ? 1 : 0.14),
+            borderRadius: BorderRadius.circular(AppRadiusTokens.input),
+            border: Border.all(
+              color: color.withValues(alpha: selected ? 1 : 0.35),
+              width: selected ? 2 : 1,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.5),
+                      blurRadius: 14,
+                      spreadRadius: -2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: AnimatedDefaultTextStyle(
+              duration: AppAnimationTokens.medium,
+              style: AppTextStyles.metricMedium.copyWith(
+                color: selected ? AppColors.onColorFor(color, scheme) : color,
+                fontWeight: FontWeight.w700,
+              ),
+              child: Text('$rating'),
+            ),
+          ),
+        ),
       ),
     );
   }

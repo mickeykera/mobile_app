@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +11,9 @@ import '../widgets/heatmap_widget.dart';
 import '../widgets/analytics_charts.dart';
 import '../../domain/analytics_data.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/theme/text_styles.dart';
 import '../../../../app/widgets/app_empty_state.dart';
+import '../../../../app/widgets/pill_chip.dart';
 import '../../../../core/constants/app_constants.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
@@ -34,6 +39,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     final sectionCount = _getSectionCount(state);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       body: CustomScrollView(
         slivers: [
           _buildSliverAppBar(context),
@@ -66,12 +72,31 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.all(16),
+              // Bottom padding clears the floating nav bar; the charts are the
+              // last thing on the page and were ending up underneath it.
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacingTokens.gutter,
+                AppSpacingTokens.gutter,
+                AppSpacingTokens.gutter,
+                96,
+              ),
               sliver: SliverList.separated(
                 itemCount: sectionCount,
                 separatorBuilder: (_, __) => const SizedBox(height: 24),
-                itemBuilder: (context, index) =>
-                    _buildSection(context, index, state, controller),
+                itemBuilder: (context, index) => _buildSection(context, index,
+                    state, controller)
+                    // Staggered entrance. The cap matters: with the long
+                    // analytics list a linear delay would leave the eighth
+                    // section waiting over a second to appear, which reads as a
+                    // stall rather than as choreography.
+                    .animate()
+                        .fadeIn(
+                          delay: Duration(
+                            milliseconds: (index * 55).clamp(0, 400),
+                          ),
+                          duration: AppAnimationTokens.slow,
+                        )
+                        .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
               ),
             ),
         ],
@@ -93,58 +118,79 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       slivers: [
         SliverAppBar(
           pinned: true,
+          // Translucent, so the hero panel scrolling up behind it stays
+          // readable through the bar instead of being chopped off at a hard
+          // line. The blur is what keeps the title legible over moving content.
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
           titleSpacing: AppSpacingTokens.lg,
-          title: Text(
-            'Analytics',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
+          title: ShaderMask(
+            shaderCallback: AppGradients.action(colorScheme.primary)
+                .createShader,
+            child: Text(
+              'Analytics',
+              style: AppTextStyles.headlineSmall.copyWith(color: Colors.white),
             ),
           ),
         ),
         SliverToBoxAdapter(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  colorScheme.secondaryContainer,
-                  colorScheme.tertiaryContainer,
-                ],
-              ),
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(AppRadiusTokens.xxl),
-              ),
-            ),
+          child: Padding(
+            // Offset for the app bar, which now floats over this panel because
+            // of `extendBodyBehindAppBar`.
             padding: const EdgeInsets.fromLTRB(
-              AppSpacingTokens.lg,
-              AppSpacingTokens.md,
-              AppSpacingTokens.lg,
-              AppSpacingTokens.lg,
+              AppSpacingTokens.gutter,
+              kToolbarHeight + AppSpacingTokens.sm,
+              AppSpacingTokens.gutter,
+              0,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    _buildStatCard('Focus', '${state.totalFocusMinutes} min',
-                        Icons.timer_outlined, colorScheme.primary),
-                    const SizedBox(width: AppSpacingTokens.sm),
-                    _buildStatCard('Entries', '${state.journalEntriesCount}',
-                        Icons.book_outlined, colorScheme.tertiary),
-                    const SizedBox(width: AppSpacingTokens.sm),
-                    _buildStatCard(
-                        'Mood',
-                        state.avgMood > 0
-                            ? state.avgMood.toStringAsFixed(1)
-                            : '—',
-                        Icons.sentiment_satisfied_outlined,
-                        colorScheme.secondary),
-                  ],
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadiusTokens.xl),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.journalHeader(colorScheme),
+                    borderRadius: BorderRadius.circular(AppRadiusTokens.xl),
+                    border: Border.all(color: AppColors.hairline(colorScheme)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.28),
+                        blurRadius: 26,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(AppSpacingTokens.lg),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          _buildStatCard(
+                              'Focus', '${state.totalFocusMinutes} min',
+                              Icons.timer_outlined, AppColors.neonCyan),
+                          const SizedBox(width: AppSpacingTokens.sm),
+                          _buildStatCard(
+                              'Entries', '${state.journalEntriesCount}',
+                              Icons.book_outlined, AppColors.radiantViolet),
+                          const SizedBox(width: AppSpacingTokens.sm),
+                          _buildStatCard(
+                            'Mood',
+                            state.avgMood > 0
+                                ? state.avgMood.toStringAsFixed(1)
+                                : '—',
+                            Icons.sentiment_satisfied_outlined,
+                            AppColors.coralOrange,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacingTokens.md),
+                      _buildPeriodSelector(context),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacingTokens.md),
-                _buildPeriodSelector(context),
-              ],
+              ),
             ),
           ),
         ),
@@ -156,30 +202,49 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       String label, String value, IconData icon, Color color) {
     final theme = Theme.of(context);
 
+    // A translucent well rather than a full card: three of these sit shoulder to
+    // shoulder, and a border on each one made the row read as three boxes
+    // instead of one strip of numbers.
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacingTokens.sm + 2,
+          vertical: AppSpacingTokens.sm + 4,
+        ),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.8),
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadiusTokens.md),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 18, color: color),
-                const Spacer(),
-                Text(value,
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700)),
-              ],
+            Icon(icon, size: 16, color: color),
+            const SizedBox(height: 6),
+            // `FittedBox` rather than a smaller font: the value is the thing
+            // being read, and 1,240 min must not wrap or ellipsize on a narrow
+            // phone while "—" sits next to it taking the same space.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
             ),
-            const SizedBox(height: 4),
-            Text(label,
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
           ],
         ),
       ),
@@ -187,34 +252,22 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Widget _buildPeriodSelector(BuildContext context) {
-    final theme = Theme.of(context);
     final state = ref.watch(analyticsControllerProvider);
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: AppConstants.analyticsPeriods.map((period) {
-          final isSelected = state.selectedPeriod == period;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(period),
-              selected: isSelected,
-              onSelected: (_) => ref
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: GlassPillRow(
+        pills: [
+          for (final period in AppConstants.analyticsPeriods)
+            GlassPill(
+              label: period,
+              selected: state.selectedPeriod == period,
+              accent: AppColors.neonCyan,
+              onTap: () => ref
                   .read(analyticsControllerProvider.notifier)
                   .setPeriod(period),
-              selectedColor: theme.colorScheme.primaryContainer,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
             ),
-          );
-        }).toList(),
+        ],
       ),
     );
   }

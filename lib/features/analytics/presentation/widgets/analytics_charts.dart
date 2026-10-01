@@ -118,10 +118,21 @@ class CategoryBarChart extends StatelessWidget {
                   barRods: [
                     BarChartRodData(
                       toY: value,
-                      color: color,
+                      // The rod fades up from the accent at its base to the
+                      // accent at its tip: a flat fill made the bars read as a
+                      // solid block, and the gradient gives each one a light
+                      // source that matches the rest of the app's surfaces.
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          color.withValues(alpha: 0.55),
+                          color,
+                        ],
+                      ),
                       width: 20,
                       borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(4)),
+                          const BorderRadius.vertical(top: Radius.circular(6)),
                       backDrawRodData: BackgroundBarChartRodData(
                         show: true,
                         toY: maxValue,
@@ -298,20 +309,21 @@ class CorrelationScatterChart extends StatelessWidget {
       );
     }
 
+    // The heading used to be rendered twice - once in the outer Column and
+    // again inside the card - so every correlation section showed its title on
+    // two consecutive lines.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('$yLabel vs $xLabel',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
+            style: theme.textTheme.titleMedium
                 ?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         SizedBox(
           height: 250,
           child: Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                   color: Theme.of(context)
@@ -323,12 +335,15 @@ class CorrelationScatterChart extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$yLabel vs $xLabel',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 16),
+                // The axes are drawn by the painter, so this top strip is the
+                // only thing left in the card: use it for the caption rather
+                // than repeating the title.
+                Text(
+                  'Each dot represents a day. X = $xLabel, Y = $yLabel (1-5)',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 12),
                 Expanded(
                   child: CustomPaint(
                     size: Size.infinite,
@@ -341,12 +356,6 @@ class CorrelationScatterChart extends StatelessWidget {
                       labelColor: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Each dot represents a day. X = Habit completion %, Y = $yLabel (1-5)',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
             ),

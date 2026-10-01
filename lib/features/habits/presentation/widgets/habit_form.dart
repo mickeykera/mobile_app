@@ -1,8 +1,14 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/habit.dart';
+import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/theme/text_styles.dart';
+import '../../../../app/widgets/glow_button.dart';
+import '../../../../app/widgets/pill_chip.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/category_type.dart';
 
@@ -66,84 +72,103 @@ class _HabitFormState extends ConsumerState<HabitForm> {
     // The sheet is opened with a transparent background, so this surface is what
     // the user actually sees. Without it the list behind bled straight through
     // and the form labels collided with the habit rows.
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppRadiusTokens.xxl),
-        ),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadiusTokens.sheetTop),
       ),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          bottom:
-              MediaQuery.of(context).viewInsets.bottom + AppSpacingTokens.lg,
-          left: AppSpacingTokens.lg,
-          right: AppSpacingTokens.lg,
-          top: AppSpacingTokens.sm,
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Drag handle, as every market sheet has.
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: AppSpacingTokens.md),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(AppRadiusTokens.full),
-                  ),
-                ),
-              ),
-              Row(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            // Translucent, like every other sheet in the app. An opaque
+            // `colorScheme.surface` here made this one sheet read as a
+            // different app from the rest of the product.
+            color: AppColors.cardFill(theme.colorScheme, opacity: 0.94),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadiusTokens.sheetTop),
+            ),
+            border: Border(
+              top: BorderSide(color: AppColors.hairline(theme.colorScheme)),
+            ),
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom +
+                  AppSpacingTokens.lg,
+              left: AppSpacingTokens.lg,
+              right: AppSpacingTokens.lg,
+              top: AppSpacingTokens.sm,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
+                  // Drag handle, as every market sheet has.
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin:
+                          const EdgeInsets.only(bottom: AppSpacingTokens.md),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.3),
+                        borderRadius:
+                            BorderRadius.circular(AppRadiusTokens.full),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+Text(
                     isEditing ? 'Edit Habit' : 'New Habit',
-                    style: theme.textTheme.headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: AppTextStyles.headlineSmall
+                        .copyWith(fontWeight: FontWeight.w800),
                   ),
                   const Spacer(),
-                  IconButton(
+                  GlowIconButton(
+                    icon: Icons.close_rounded,
+                    accent: theme.colorScheme.onSurfaceVariant,
+                    size: 40,
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
                   ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacingTokens.lg),
+
+                  _buildTitleField(),
+                  const SizedBox(height: AppSpacingTokens.md),
+
+                  _buildDescriptionField(),
+                  const SizedBox(height: AppSpacingTokens.md),
+
+                  _buildCategorySelector(),
+                  const SizedBox(height: AppSpacingTokens.md),
+
+                  _buildCueField(),
+                  const SizedBox(height: AppSpacingTokens.md),
+
+                  _buildFrequencySelector(),
+                  const SizedBox(height: AppSpacingTokens.md),
+
+                  if (_frequency == AppConstants.frequencyCustom)
+                    _buildCustomWeekdaysSelector(),
+                  if (_frequency == AppConstants.frequencyCustom)
+                    const SizedBox(height: AppSpacingTokens.md),
+
+                  _buildTimeOfDaySelector(),
+                  const SizedBox(height: AppSpacingTokens.md),
+
+                  _buildTargetFields(),
+                  const SizedBox(height: AppSpacingTokens.lg),
+
+                  _buildSaveButton(),
+                  const SizedBox(height: AppSpacingTokens.sm),
                 ],
               ),
-              const SizedBox(height: AppSpacingTokens.lg),
-
-              _buildTitleField(),
-              const SizedBox(height: AppSpacingTokens.md),
-
-              _buildDescriptionField(),
-              const SizedBox(height: AppSpacingTokens.md),
-
-              _buildCategorySelector(),
-              const SizedBox(height: AppSpacingTokens.md),
-
-              _buildCueField(),
-              const SizedBox(height: AppSpacingTokens.md),
-
-              _buildFrequencySelector(),
-              const SizedBox(height: AppSpacingTokens.md),
-
-              if (_frequency == AppConstants.frequencyCustom)
-                _buildCustomWeekdaysSelector(),
-              if (_frequency == AppConstants.frequencyCustom)
-                const SizedBox(height: AppSpacingTokens.md),
-
-              _buildTimeOfDaySelector(),
-              const SizedBox(height: AppSpacingTokens.md),
-
-              _buildTargetFields(),
-              const SizedBox(height: AppSpacingTokens.lg),
-
-              _buildSaveButton(),
-            ],
+            ),
           ),
         ),
       ),
@@ -158,6 +183,9 @@ class _HabitFormState extends ConsumerState<HabitForm> {
         hintText: 'e.g., Morning meditation, Daily exercise',
         prefixIcon: Icon(Icons.flag_outlined),
       ),
+      // `maxLength` was only validated, never declared, so the field never
+      // enforced or displayed the 100-character limit it claimed to have.
+      maxLength: 100,
       validator: (value) {
         if (value == null || value.trim().isEmpty) {
           return 'Please enter a habit title';
@@ -187,47 +215,13 @@ class _HabitFormState extends ConsumerState<HabitForm> {
   }
 
   Widget _buildCategorySelector() {
-    final theme = Theme.of(context);
-    final categories = AppConstants.habitCategories;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Category',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w500)),
-        const SizedBox(height: AppSpacingTokens.sm),
-        Wrap(
-          spacing: AppSpacingTokens.sm,
-          runSpacing: AppSpacingTokens.sm,
-          children: categories.map((category) {
-            final isSelected = _category == category;
-            final color = _getCategoryColor(category);
-            return FilterChip(
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(_getCategoryIcon(category), size: 16),
-                  const SizedBox(width: 6),
-                  Text(category),
-                ],
-              ),
-              selected: isSelected,
-              onSelected: (_) => setState(() => _category = category),
-              selectedColor: color.withValues(alpha: 0.2),
-              checkmarkColor: color,
-              labelStyle: TextStyle(
-                color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-              side: BorderSide(
-                  color: isSelected ? color : theme.colorScheme.outline),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadiusTokens.full)),
-            );
-          }).toList(),
-        ),
-      ],
+    return _buildChipGroup(
+      label: 'Category',
+      options: AppConstants.habitCategories,
+      selected: _category,
+      accentFor: _getCategoryColor,
+      iconFor: _getCategoryIcon,
+      onSelected: (category) => setState(() => _category = category),
     );
   }
 
@@ -244,43 +238,17 @@ class _HabitFormState extends ConsumerState<HabitForm> {
   }
 
   Widget _buildFrequencySelector() {
-    final theme = Theme.of(context);
-    const frequencies = AppConstants.frequencies;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Frequency',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w500)),
-        const SizedBox(height: AppSpacingTokens.sm),
-        Wrap(
-          spacing: AppSpacingTokens.sm,
-          runSpacing: AppSpacingTokens.sm,
-          children: frequencies.map((frequency) {
-            final isSelected = _frequency == frequency;
-            return FilterChip(
-              label: Text(frequency),
-              selected: isSelected,
-              onSelected: (_) => setState(() {
-                _frequency = frequency;
-                if (frequency != AppConstants.frequencyCustom) {
-                  _customWeekdays = [];
-                }
-              }),
-              selectedColor: theme.colorScheme.primaryContainer,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadiusTokens.full)),
-            );
-          }).toList(),
-        ),
-      ],
+    return _buildChipGroup(
+      label: 'Frequency',
+      options: AppConstants.frequencies,
+      selected: _frequency,
+      accentFor: (_) => AppColors.neonCyan,
+      onSelected: (frequency) => setState(() {
+        _frequency = frequency;
+        if (frequency != AppConstants.frequencyCustom) {
+          _customWeekdays = [];
+        }
+      }),
     );
   }
 
@@ -291,9 +259,12 @@ class _HabitFormState extends ConsumerState<HabitForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Select Days',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w500)),
+        Text(
+          'Select Days',
+          style: AppTextStyles.labelLarge.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: AppSpacingTokens.sm),
         Wrap(
           spacing: AppSpacingTokens.sm,
@@ -301,10 +272,11 @@ class _HabitFormState extends ConsumerState<HabitForm> {
           children: List.generate(7, (index) {
             final dayNum = index + 1;
             final isSelected = _customWeekdays.contains(dayNum);
-            return FilterChip(
-              label: Text(days[index]),
+            return GlassPill(
+              label: days[index],
               selected: isSelected,
-              onSelected: (_) {
+              accent: AppColors.radiantViolet,
+              onTap: () {
                 setState(() {
                   if (isSelected) {
                     _customWeekdays.remove(dayNum);
@@ -313,25 +285,29 @@ class _HabitFormState extends ConsumerState<HabitForm> {
                   }
                 });
               },
-              selectedColor: theme.colorScheme.primaryContainer,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadiusTokens.full)),
             );
           }),
         ),
         if (_customWeekdays.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: AppSpacingTokens.xs),
-            child: Text(
-              'Please select at least one day',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.error),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 14,
+                  color: theme.colorScheme.error,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Pick at least one day',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
       ],
@@ -339,42 +315,62 @@ class _HabitFormState extends ConsumerState<HabitForm> {
   }
 
   Widget _buildTimeOfDaySelector() {
+    return _buildChipGroup(
+      label: 'Time of Day',
+      options: AppConstants.timeOfDayTags,
+      selected: _timeOfDay,
+      // Morning is warm, afternoon neutral, evening violet: the accent carries
+      // the meaning of the slot without having to read the label.
+      accentFor: (time) => switch (time) {
+        'Morning' => AppColors.coralOrange,
+        'Afternoon' => AppColors.neonCyan,
+        'Evening' => AppColors.radiantViolet,
+        _ => AppColors.neonCyan,
+      },
+      iconFor: _getTimeIcon,
+      onSelected: (time) => setState(() => _timeOfDay = time),
+    );
+  }
+
+  /// The shared chip row behind category, frequency and time of day.
+  ///
+  /// These were three near-identical `FilterChip` `Wrap`s. `FilterChip` also
+  /// draws its own checkmark, which meant a selected option showed a tick *and*
+  /// a colour change, and the tick could not be tinted to match on the dark
+  /// theme.
+  Widget _buildChipGroup({
+    required String label,
+    required List<String> options,
+    required String selected,
+    required Color Function(String) accentFor,
+    required void Function(String) onSelected,
+    IconData? Function(String)? iconFor,
+  }) {
     final theme = Theme.of(context);
-    const times = AppConstants.timeOfDayTags;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Time of Day',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: AppTextStyles.labelLarge.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: AppSpacingTokens.sm),
         Wrap(
           spacing: AppSpacingTokens.sm,
           runSpacing: AppSpacingTokens.sm,
-          children: times.map((time) {
-            final isSelected = _timeOfDay == time;
-            final icon = _getTimeIcon(time);
-            return FilterChip(
-              avatar: Icon(icon,
-                  size: 18,
-                  color: isSelected
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurfaceVariant),
-              label: Text(time),
-              selected: isSelected,
-              onSelected: (_) => setState(() => _timeOfDay = time),
-              selectedColor: theme.colorScheme.primaryContainer,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          children: [
+            for (final option in options)
+              GlassPill(
+                label: option,
+                icon: iconFor?.call(option),
+                selected: selected == option,
+                accent: accentFor(option),
+                onTap: () => onSelected(option),
               ),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadiusTokens.full)),
-            );
-          }).toList(),
+          ],
         ),
       ],
     );
@@ -426,15 +422,12 @@ class _HabitFormState extends ConsumerState<HabitForm> {
   Widget _buildSaveButton() {
     final isEditing = widget.habit != null;
 
-    return FilledButton.icon(
+    return GlowButton(
+      label: isEditing ? 'Save Changes' : 'Create Habit',
+      icon: isEditing ? Icons.save_rounded : Icons.add_rounded,
+      accent: _getCategoryColor(_category),
+      width: double.infinity,
       onPressed: _save,
-      icon: Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
-      label: Text(isEditing ? 'Save Changes' : 'Create Habit'),
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadiusTokens.lg)),
-      ),
     );
   }
 

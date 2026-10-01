@@ -1,12 +1,26 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_colors.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-
-import '../../domain/entities/habit.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/theme/text_styles.dart';
+import '../../../../app/widgets/glass_card.dart';
 import '../../../../app/widgets/mini_week_strip.dart';
+import '../../domain/entities/habit.dart';
 
+/// A single habit row.
+///
+/// The surface is a translucent card with a category-coloured wash, the
+/// completion control is a custom animated circle rather than a checkbox, and
+/// the whole card can be swiped to archive or delete.
+///
+/// [onTap] / [onLongPress] open the editor and the options sheet. [onComplete] /
+/// [onUncomplete] drive the completion circle. When [onArchive] or [onDelete] is
+/// supplied the card becomes swipeable; when neither is, it does not, so a
+/// caller cannot accidentally get a swipe target that does nothing.
 class HabitCard extends StatelessWidget {
   final Habit habit;
   final bool isCompleted;
@@ -14,6 +28,12 @@ class HabitCard extends StatelessWidget {
   final VoidCallback? onComplete;
   final VoidCallback? onUncomplete;
   final VoidCallback? onLongPress;
+
+  /// Invoked on a swipe-to-the-start. Returning false cancels the dismiss.
+  final FutureOr<bool> Function()? onArchive;
+
+  /// Invoked on a swipe-to-the-end. Returning false cancels the dismiss.
+  final FutureOr<bool> Function()? onDelete;
 
   const HabitCard({
     super.key,
@@ -23,101 +43,69 @@ class HabitCard extends StatelessWidget {
     this.onComplete,
     this.onUncomplete,
     this.onLongPress,
+    this.onArchive,
+    this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final categoryColor = habit.categoryColor;
+    final card = _buildCard(context);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(AppRadiusTokens.lg),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isCompleted
-                ? categoryColor.withValues(alpha: 0.1)
-                : theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadiusTokens.lg),
-            border: Border.all(
-              color: isCompleted
-                  ? categoryColor.withValues(alpha: 0.3)
-                  : theme.colorScheme.outline.withValues(alpha: 0.2),
-              width: isCompleted ? 2 : 1,
-            ),
-          ),
-          padding: const EdgeInsets.all(AppSpacingTokens.md),
-          child: Row(
-            children: [
-              _buildCompletionButton(context),
-              const SizedBox(width: AppSpacingTokens.md),
-              Expanded(child: _buildHabitInfo(context)),
-              const SizedBox(width: AppSpacingTokens.md),
-              _buildStreakBadge(context),
-            ],
-          ),
-        ),
-      ).animate().fadeIn(duration: 300.ms).slideX(begin: 0.1, end: 0),
+    final canSwipe = onArchive != null || onDelete != null;
+    if (!canSwipe) return card;
+
+    return _SwipeableHabitCard(
+      habit: habit,
+      onArchive: onArchive,
+      onDelete: onDelete,
+      child: card,
     );
   }
 
-  Widget _buildCompletionButton(BuildContext context) {
-    final categoryColor = habit.categoryColor;
+  Widget _buildCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = habit.categoryColor;
 
-    return GestureDetector(
-      onTap: () async {
-        if (isCompleted) {
-          onUncomplete?.call();
-        } else {
-          onComplete?.call();
-        }
-      },
-      // An explicit scale rather than a `.animate(target: ...)` on the child:
-      // the target-0 form collapsed the 48dp target to nothing, leaving the
-      // habit impossible to tick.
-      child: AnimatedScale(
-        scale: isCompleted ? 1.0 : 0.94,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutBack,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOutCubic,
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isCompleted ? categoryColor : Colors.transparent,
-            border: Border.all(
-              color: isCompleted
-                  ? categoryColor
-                  : categoryColor.withValues(alpha: 0.5),
-              width: 2.5,
-            ),
-            boxShadow: isCompleted
-                ? [
-                    BoxShadow(
-                      color: categoryColor.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : null,
+    return Semantics(
+      button: true,
+      label: '${habit.title}, ${habit.category}'
+          '${isCompleted ? ', completed today' : ''}',
+      child: ExcludeSemantics(
+        child: GlassCard(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          padding: const EdgeInsets.all(AppSpacingTokens.md - 2),
+          tint: accent,
+          // Completed rows get a stronger wash and a lit border so the list
+          // reads at a glance: done rows recede, pending rows pop.
+          tintOpacity: isCompleted ? 0.16 : 0.07,
+          border: Border.all(
+            color: isCompleted
+                ? accent.withValues(alpha: 0.45)
+                : AppColors.hairline(scheme),
+            width: isCompleted ? 1.5 : 1,
           ),
-          child: isCompleted
-              ? Icon(
-                  Icons.check,
-                  // White fails AA on three of the four category accents
-                  // (and scores just 3.2 on the amber one), so the tick picks
-                  // whichever foreground actually reads against the fill.
-                  color: AppColors.onColorFor(
-                      categoryColor, Theme.of(context).colorScheme),
-                  size: 24,
-                )
-              : Icon(Icons.add,
-                  color: categoryColor.withValues(alpha: 0.7), size: 24),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _CompletionToggle(
+                isCompleted: isCompleted,
+                accent: accent,
+                onTap: () {
+                  if (isCompleted) {
+                    onUncomplete?.call();
+                  } else {
+                    onComplete?.call();
+                  }
+                },
+              ),
+              const SizedBox(width: AppSpacingTokens.md - 2),
+              Expanded(child: _buildHabitInfo(context)),
+              const SizedBox(width: AppSpacingTokens.sm),
+              _buildStreakBadge(context),
+            ],
+          ),
         ),
       ),
     );
@@ -125,118 +113,95 @@ class HabitCard extends StatelessWidget {
 
   Widget _buildHabitInfo(BuildContext context) {
     final theme = Theme.of(context);
-    final categoryColor = habit.categoryColor;
+    final scheme = theme.colorScheme;
+    final accent = habit.categoryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: categoryColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppRadiusTokens.full),
-              ),
-              child: Text(
-                habit.category,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: categoryColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            _CategoryTag(label: habit.category, accent: accent),
             if (habit.targetDuration.inMinutes > 0) ...[
-              const SizedBox(width: AppSpacingTokens.xs),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppRadiusTokens.full),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.timer_outlined,
-                      size: 12,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${habit.targetDuration.inMinutes} min',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(width: 6),
+              _MetaTag(
+                icon: Icons.timer_outlined,
+                label: '${habit.targetDuration.inMinutes} min',
               ),
             ],
           ],
         ),
-        const SizedBox(height: AppSpacingTokens.xs),
-        Text(
-          habit.title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+        const SizedBox(height: AppSpacingTokens.sm - 2),
+        // The title strikes through rather than fading, so "done" is legible
+        // without relying on colour alone.
+        AnimatedDefaultTextStyle(
+          duration: AppAnimationTokens.medium,
+          curve: Curves.easeOutCubic,
+          style: AppTextStyles.titleMedium.copyWith(
             color: isCompleted
-                ? theme.colorScheme.onSurfaceVariant
-                : theme.colorScheme.onSurface,
+                ? scheme.onSurfaceVariant
+                : scheme.onSurface,
             decoration: isCompleted ? TextDecoration.lineThrough : null,
+            decorationColor: scheme.onSurfaceVariant.withValues(alpha: 0.5),
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          child: Text(
+            habit.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         if (habit.description.isNotEmpty) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             habit.description,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: scheme.onSurfaceVariant,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],
-        const SizedBox(height: AppSpacingTokens.xs),
-        // The seven-square chain gives a per-habit read on consistency that the
+        const SizedBox(height: AppSpacingTokens.sm),
+        // The seven-tile chain gives a per-habit read on consistency that the
         // streak number alone cannot: it shows *where* in the week it broke.
         MiniWeekStrip(
           days: deriveWeekStates(
             lastCompletedAt: habit.lastCompletedAt,
             currentStreak: habit.currentStreak,
           ),
-          accent: categoryColor,
+          accent: accent,
         ),
-        const SizedBox(height: AppSpacingTokens.xs),
+        const SizedBox(height: AppSpacingTokens.sm),
         Row(
           children: [
             Icon(
-              _getTimeOfDayIcon(habit.timeOfDay),
-              size: 14,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              _timeOfDayIcon(habit.timeOfDay),
+              size: 13,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
             ),
             const SizedBox(width: 4),
             Text(
               habit.timeOfDay,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color:
-                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              style: AppTextStyles.labelSmall.copyWith(
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
               ),
             ),
             const SizedBox(width: AppSpacingTokens.sm),
             Icon(
-              _getFrequencyIcon(habit.frequency),
-              size: 14,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              _frequencyIcon(habit.frequency),
+              size: 13,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
             ),
             const SizedBox(width: 4),
-            Text(
-              _getFrequencyLabel(habit.frequency, habit.customWeekdays),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color:
-                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            Flexible(
+              child: Text(
+                _frequencyLabel(habit.frequency, habit.customWeekdays),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
+                ),
               ),
             ),
           ],
@@ -247,7 +212,8 @@ class HabitCard extends StatelessWidget {
 
   Widget _buildStreakBadge(BuildContext context) {
     final theme = Theme.of(context);
-    final categoryColor = habit.categoryColor;
+    final scheme = theme.colorScheme;
+    final accent = habit.categoryColor;
 
     if (habit.currentStreak == 0 && habit.longestStreak == 0) {
       return const SizedBox.shrink();
@@ -255,27 +221,38 @@ class HabitCard extends StatelessWidget {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        AnimatedContainer(
+          duration: AppAnimationTokens.medium,
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
           decoration: BoxDecoration(
-            color: categoryColor.withValues(alpha: 0.15),
+            color: accent.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(AppRadiusTokens.full),
+            border: Border.all(color: accent.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.2),
+                blurRadius: 8,
+                spreadRadius: -2,
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.local_fire_department_rounded,
-                size: 16,
-                color: categoryColor,
+                size: 14,
+                color: accent,
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 3),
               Text(
                 '${habit.currentStreak}',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: categoryColor,
-                  fontWeight: FontWeight.w700,
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -284,9 +261,10 @@ class HabitCard extends StatelessWidget {
         if (habit.longestStreak > habit.currentStreak) ...[
           const SizedBox(height: 4),
           Text(
-            'Best: ${habit.longestStreak}',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            'Best ${habit.longestStreak}',
+            style: AppTextStyles.labelSmall.copyWith(
+              fontSize: 9.5,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.55),
             ),
           ),
         ],
@@ -294,35 +272,35 @@ class HabitCard extends StatelessWidget {
     );
   }
 
-  IconData _getTimeOfDayIcon(String timeOfDay) {
+  IconData _timeOfDayIcon(String timeOfDay) {
     switch (timeOfDay) {
       case 'Morning':
-        return Icons.wb_sunny_outlined;
+        return Icons.wb_twilight_rounded;
       case 'Afternoon':
-        return Icons.wb_sunny_outlined;
+        return Icons.wb_sunny_rounded;
       case 'Evening':
-        return Icons.nights_stay_outlined;
+        return Icons.nights_stay_rounded;
       default:
-        return Icons.access_time_outlined;
+        return Icons.access_time_rounded;
     }
   }
 
-  IconData _getFrequencyIcon(String frequency) {
+  IconData _frequencyIcon(String frequency) {
     switch (frequency) {
       case 'Daily':
-        return Icons.repeat_outlined;
+        return Icons.repeat_rounded;
       case 'Weekdays':
-        return Icons.calendar_today_outlined;
+        return Icons.calendar_today_rounded;
       case 'Weekends':
-        return Icons.weekend_outlined;
+        return Icons.weekend_rounded;
       case 'Custom':
-        return Icons.tune_outlined;
+        return Icons.tune_rounded;
       default:
-        return Icons.repeat_outlined;
+        return Icons.repeat_rounded;
     }
   }
 
-  String _getFrequencyLabel(String frequency, List<int> customWeekdays) {
+  String _frequencyLabel(String frequency, List<int> customWeekdays) {
     switch (frequency) {
       case 'Daily':
         return 'Daily';
@@ -332,10 +310,401 @@ class HabitCard extends StatelessWidget {
         return 'Sat-Sun';
       case 'Custom':
         if (customWeekdays.isEmpty) return 'Custom';
-        final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         return customWeekdays.map((d) => days[d - 1]).join(', ');
       default:
         return frequency;
     }
+  }
+}
+
+/// Wraps the card in a [Dismissible] with rounded, icon-morphing backgrounds.
+class _SwipeableHabitCard extends StatefulWidget {
+  final Habit habit;
+  final FutureOr<bool> Function()? onArchive;
+  final FutureOr<bool> Function()? onDelete;
+  final Widget child;
+
+  const _SwipeableHabitCard({
+    required this.habit,
+    required this.child,
+    this.onArchive,
+    this.onDelete,
+  });
+
+  @override
+  State<_SwipeableHabitCard> createState() => _SwipeableHabitCardState();
+}
+
+class _SwipeableHabitCardState extends State<_SwipeableHabitCard> {
+  /// Live drag distance, 0..1, fed from `Dismissible.onUpdate`.
+  ///
+  /// Dismissible exposes no progress to its backgrounds, so this is how the
+  /// icon grows and rotates as the card is dragged rather than snapping in at
+  /// the commit threshold.
+  final ValueNotifier<double> _progress = ValueNotifier(0);
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: ValueKey('habit-${widget.habit.id}'),
+      background: widget.onArchive == null
+          ? null
+          : _SwipeBackground(
+              progress: _progress,
+              alignment: Alignment.centerLeft,
+              accent: AppColors.habitBody,
+              icon: widget.habit.isArchived
+                  ? Icons.unarchive_rounded
+                  : Icons.archive_rounded,
+              label: widget.habit.isArchived ? 'Unarchive' : 'Archive',
+            ),
+      secondaryBackground: widget.onDelete == null
+          ? null
+          : _SwipeBackground(
+              progress: _progress,
+              alignment: Alignment.centerRight,
+              accent: Theme.of(context).colorScheme.error,
+              icon: Icons.delete_rounded,
+              label: 'Delete',
+            ),
+      // Both handlers must confirm. `confirmDismiss` is async, so a destructive
+      // swipe that the user cancels restores the card without the list ever
+      // having been told to remove it.
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          return await widget.onArchive?.call() ?? false;
+        }
+        return await widget.onDelete?.call() ?? false;
+      },
+      onUpdate: (details) => _progress.value = details.progress,
+      child: widget.child,
+    );
+  }
+}
+
+/// The rounded panel revealed behind a swiped card.
+///
+/// The radius is asymmetric: square against the trailing edge the card is
+/// sliding away from, rounded on the leading edge where the card still sits, so
+/// the revealed shape follows the card rather than looking like a second card.
+class _SwipeBackground extends StatelessWidget {
+  final ValueListenable<double> progress;
+  final Alignment alignment;
+  final Color accent;
+  final IconData icon;
+  final String label;
+
+  const _SwipeBackground({
+    required this.progress,
+    required this.alignment,
+    required this.accent,
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isLeft = alignment == Alignment.centerLeft;
+
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacingTokens.lg),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.horizontal(
+          // The card covers the outer edge, so only the inner edge is visible.
+          left: Radius.circular(isLeft ? 0 : AppRadiusTokens.lg),
+          right: Radius.circular(isLeft ? AppRadiusTokens.lg : 0),
+        ),
+      ),
+      child: ValueListenableBuilder<double>(
+        valueListenable: progress,
+        builder: (context, value, child) {
+          // Ramp the icon in over the first 40% of the drag, then hold. Scaling
+          // it linearly with the whole drag made it look like it was falling
+          // behind the card.
+          final t = (value / 0.4).clamp(0.0, 1.0);
+          return Opacity(
+            opacity: t,
+            child: Transform.scale(
+              scale: 0.7 + t * 0.3,
+              child: child,
+            ),
+          );
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!isLeft) Text(label, style: _labelStyle(accent)),
+            if (!isLeft) const SizedBox(width: 8),
+            Icon(icon, color: accent, size: 22),
+            if (isLeft) const SizedBox(width: 8),
+            if (isLeft) Text(label, style: _labelStyle(accent)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  TextStyle _labelStyle(Color accent) => AppTextStyles.labelLarge.copyWith(
+        color: accent,
+        fontWeight: FontWeight.w700,
+      );
+}
+
+/// The custom animated completion circle.
+///
+/// Replaces Material's checkbox. On the way to completed it runs a
+/// celebratory two-stage pop - out past 1.1, then an elastic settle back to 1 -
+/// and crosses a heavier haptic, because this is the single most important
+/// interaction in the app and deserves more than the light impact a generic tap
+/// gets.
+class _CompletionToggle extends StatefulWidget {
+  final bool isCompleted;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _CompletionToggle({
+    required this.isCompleted,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  State<_CompletionToggle> createState() => _CompletionToggleState();
+}
+
+class _CompletionToggleState extends State<_CompletionToggle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pop;
+
+  /// The squash-in / overshoot / elastic-settle curve, sampled off [_pop].
+  late final Animation<double> _popScale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 0.8, end: 1.12).chain(
+        CurveTween(curve: Curves.easeOut),
+      ),
+      weight: 28,
+    ),
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 1.12, end: 1).chain(
+        CurveTween(curve: Curves.elasticOut),
+      ),
+      weight: 72,
+    ),
+  ]).animate(_pop);
+
+  static const double _diameter = 46;
+
+  @override
+  void initState() {
+    super.initState();
+    _pop = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 560),
+      // Rests at 1, which maps to the end of the sequence and therefore to a
+      // scale of exactly 1.0. Starting at 0 would rest the circle visibly
+      // squashed.
+      value: 1,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_CompletionToggle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isCompleted == oldWidget.isCompleted) return;
+
+    if (widget.isCompleted) {
+      HapticFeedback.mediumImpact();
+      _pop.forward(from: 0);
+    } else {
+      // Return to rest so an interrupt mid-bounce does not leave the circle
+      // stuck slightly oversized.
+      _pop.animateTo(1, duration: AppAnimationTokens.medium);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = widget.accent;
+    final ink = AppColors.onColorFor(accent, scheme);
+
+    return Semantics(
+      checked: widget.isCompleted,
+      button: true,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedBuilder(
+          animation: _pop,
+          builder: (context, child) {
+            // A single tween cannot express this: the brief's
+            // `.scale(begin: Offset(0.8, 0.8), end: Offset(1.1, 1.1))` has to
+            // land on 1.0, not 1.1, or the circle is left permanently 10%
+            // oversized. So squash in, overshoot to 1.12, then settle back to
+            // exactly 1.0. `elasticOut` on the second half is what makes it
+            // read as a bounce rather than a plain ease-out.
+            final scale = _popScale.value;
+            return Transform.scale(scale: scale, child: child);
+          },
+          child: AnimatedContainer(
+            duration: AppAnimationTokens.medium,
+            curve: Curves.easeOutCubic,
+            width: _diameter,
+            height: _diameter,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: widget.isCompleted
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        accent,
+                        Color.lerp(accent, AppColors.radiantViolet, 0.3)!,
+                      ],
+                    )
+                  : null,
+              color: widget.isCompleted ? null : accent.withValues(alpha: 0.08),
+              border: Border.all(
+                color: widget.isCompleted
+                    ? Colors.transparent
+                    : accent.withValues(alpha: 0.45),
+                width: 2,
+              ),
+              boxShadow: widget.isCompleted
+                  ? [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.45),
+                        blurRadius: 14,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: AnimatedSwitcher(
+              duration: AppAnimationTokens.medium,
+              switchInCurve: Curves.easeOutBack,
+              // The tick cross-fades in but the surrounding circle is already
+              // scaling, so fading the outgoing icon out over the same window
+              // would make two ticks visible at once mid-pop.
+              transitionBuilder: (child, animation) =>
+                  ScaleTransition(scale: animation, child: FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  )),
+              child: widget.isCompleted
+                  ? Icon(
+                      Icons.check_rounded,
+                      key: const ValueKey('done'),
+                      size: 24,
+                      color: ink,
+                    )
+                  : Icon(
+                      Icons.add_rounded,
+                      key: const ValueKey('todo'),
+                      size: 22,
+                      color: accent.withValues(alpha: 0.75),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small rounded category pill.
+///
+/// The dot carries the category colour and the text stays muted, so a card with
+/// four chips in it does not turn into four competing colours.
+class _CategoryTag extends StatelessWidget {
+  final String label;
+  final Color accent;
+
+  const _CategoryTag({required this.label, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadiusTokens.full),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: accent,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: accent, blurRadius: 4, spreadRadius: 0.5),
+              ],
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: AppTextStyles.labelSmall.copyWith(
+              fontSize: 10,
+              color: accent,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaTag extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _MetaTag({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.onSurface.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(AppRadiusTokens.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: AppTextStyles.labelSmall.copyWith(
+              fontSize: 10,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
