@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../../domain/entities/journal_entry.dart';
 import '../../data/repositories/journal_repository_impl.dart';
 import '../../domain/repositories/journal_repository.dart';
@@ -32,7 +33,7 @@ class JournalController extends StateNotifier<JournalState> {
 
   Future<void> _loadInitialData() async {
     state = state.copyWith(isLoading: true, error: null);
-    final today = DateTime.now();
+    final today = AppClock.now();
 
     await _loadEntriesForDate(today);
     final recentResult = await _repository.getEntries(limit: 20);
@@ -107,7 +108,7 @@ class JournalController extends StateNotifier<JournalState> {
   }) async {
     state = state.copyWith(isSaving: true, error: null);
 
-    final date = state.selectedDate ?? DateTime.now();
+    final date = state.selectedDate ?? AppClock.now();
     final type = state.selectedType;
     final currentEntry = getCurrentEntry();
 
@@ -119,7 +120,7 @@ class JournalController extends StateNotifier<JournalState> {
         energyRating: energyRating,
         tags: tags,
         gratitudeNote: gratitudeNote,
-        updatedAt: DateTime.now(),
+        updatedAt: AppClock.now(),
       );
     } else if (type == 'Morning') {
       entry = JournalEntry.createMorning(

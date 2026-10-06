@@ -54,3 +54,7 @@ devtools_options.yaml
 
 # Local agent/tool settings; developer-specific.
 .claude/
+
+# Golden test diffs. flutter_test writes master/test/isolatedDiff PNGs here on
+# every failure - useful while a golden is failing, noise once it is fixed.
+test/**/failures/

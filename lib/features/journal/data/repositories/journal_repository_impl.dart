@@ -1,21 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../../domain/entities/journal_entry.dart';
 import '../../domain/repositories/journal_repository.dart';
+import '../../../progress/domain/services/progress_service.dart';
 import 'package:ascend/core/core.dart';
 
 class JournalRepositoryImpl implements JournalRepository {
   final DatabaseService _database;
   final List<JournalEntry> _entries = [];
-  bool _loaded = false;
 
-  JournalRepositoryImpl(this._database);
+  /// Shared with the other repositories so the rating buckets have one
+  /// definition; it is a pure calculator, so a default instance is enough.
+  final ProgressService _progress;
 
-  Future<void> _ensureLoaded() async {
-    if (_loaded) return;
-    await _loadFromPrefs();
-    _loaded = true;
-  }
+  /// Memoised load, not a `bool` guard.
+  ///
+  /// `if (_loaded) return; await _loadFromPrefs(); _loaded = true;` loses the
+  /// race: two callers both read `_loaded == false` before either finishes the
+  /// `await`, so both run the load and both append to the cache. That doubles
+  /// every row - one stored habit came back as two with the same id.
+  ///
+  /// Holding the `Future` makes the guard idempotent, because `??=` resolves
+  /// the first caller's future for everyone who arrives while it is in flight.
+  Future<void>? _loading;
+
+  JournalRepositoryImpl(this._database, [ProgressService? progress])
+      : _progress = progress ?? const ProgressService();
+
+  Future<void> _ensureLoaded() => _loading ??= _loadFromPrefs();
 
   Future<void> _loadFromPrefs() async {
     final entriesJson = _database.getJsonList('journal_entries') ?? [];
@@ -160,7 +173,7 @@ class JournalRepositoryImpl implements JournalRepository {
   Future<Result<Map<DateTime, int>>> getEntryHeatmap({int weeks = 12}) async {
     await _ensureLoaded();
     try {
-      final endDate = DateTime.now();
+      final endDate = AppClock.now();
       final startDate = endDate.subtract(Duration(days: weeks * 7));
 
       final entries = _entries
@@ -189,7 +202,7 @@ class JournalRepositoryImpl implements JournalRepository {
       {DateTime? startDate, DateTime? endDate}) async {
     await _ensureLoaded();
     try {
-      var entries = _entries.where((e) => e.moodRating != null).toList();
+      var entries = _entries.toList();
 
       if (startDate != null) {
         entries = entries
@@ -206,16 +219,8 @@ class JournalRepositoryImpl implements JournalRepository {
             .toList();
       }
 
-      final distribution = <String, int>{};
-      final labels = ['Very Low', 'Low', 'Neutral', 'High', 'Very High'];
-      for (final entry in entries) {
-        if (entry.moodRating != null &&
-            entry.moodRating! >= 1 &&
-            entry.moodRating! <= 5) {
-          final label = labels[entry.moodRating! - 1];
-          distribution[label] = (distribution[label] ?? 0) + 1;
-        }
-      }
+      final distribution =
+          _progress.moodDistribution(entries.map((e) => e.moodRating));
       return Either.right(distribution);
     } catch (e, st) {
       return Either.left(CacheFailure('Failed to get mood distribution: $e',
@@ -228,7 +233,7 @@ class JournalRepositoryImpl implements JournalRepository {
       {DateTime? startDate, DateTime? endDate}) async {
     await _ensureLoaded();
     try {
-      var entries = _entries.where((e) => e.energyRating != null).toList();
+      var entries = _entries.toList();
 
       if (startDate != null) {
         entries = entries
@@ -245,16 +250,8 @@ class JournalRepositoryImpl implements JournalRepository {
             .toList();
       }
 
-      final distribution = <String, int>{};
-      final labels = ['Very Low', 'Low', 'Neutral', 'High', 'Very High'];
-      for (final entry in entries) {
-        if (entry.energyRating != null &&
-            entry.energyRating! >= 1 &&
-            entry.energyRating! <= 5) {
-          final label = labels[entry.energyRating! - 1];
-          distribution[label] = (distribution[label] ?? 0) + 1;
-        }
-      }
+      final distribution =
+          _progress.energyDistribution(entries.map((e) => e.energyRating));
       return Either.right(distribution);
     } catch (e, st) {
       return Either.left(CacheFailure('Failed to get energy distribution: $e',
@@ -282,5 +279,5 @@ class JournalRepositoryImpl implements JournalRepository {
 
 final journalRepositoryProvider = Provider<JournalRepository>((ref) {
   final database = ref.watch(databaseServiceProvider);
-  return JournalRepositoryImpl(database);
+  return JournalRepositoryImpl(database, ref.watch(progressServiceProvider));
 });

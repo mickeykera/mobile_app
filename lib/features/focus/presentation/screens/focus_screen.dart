@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../controllers/focus_controller.dart';
 import '../widgets/focus_timer.dart';
 import '../../domain/entities/focus_session.dart';
@@ -15,6 +16,9 @@ import '../../../../app/widgets/glass_card.dart';
 import '../../../../app/widgets/glow_button.dart';
 import '../../../../app/widgets/pressable.dart';
 import '../../../../app/widgets/pill_chip.dart';
+import '../../../habits/presentation/providers/habit_providers.dart';
+import '../../../projects/presentation/providers/project_providers.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class FocusScreen extends ConsumerStatefulWidget {
   const FocusScreen({super.key});
@@ -83,8 +87,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
               width: 420,
               height: 420,
               child: AuroraBackdrop(
-                accentA: AppColors.neonCyan,
-                accentB: AppColors.radiantViolet,
+                accentA: AppColors.accentPrimary,
+                accentB: AppColors.accentDeep,
                 opacity: 0.14,
               ),
             ),
@@ -141,7 +145,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
             children: [
               ShaderMask(
                 // Gradient headline, so the title is lit rather than flat white.
-                shaderCallback: AppGradients.action(colorScheme.primary).createShader,
+                shaderCallback:
+                    AppGradients.action(colorScheme.primary).createShader,
                 child: Text(
                   'Deep Work',
                   style: AppTextStyles.headlineMedium.copyWith(
@@ -161,7 +166,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
         ),
         if (state.activeSession == null)
           GlowIconButton(
-            icon: Icons.tune_rounded,
+            icon: LucideIcons.slidersHorizontal,
             accent: colorScheme.primary,
             tooltip: 'Session Settings',
             onPressed: _showSettings,
@@ -171,7 +176,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
   }
 
   String _getGreeting() {
-    final hour = DateTime.now().hour;
+    final hour = AppClock.now().hour;
     if (hour < 12) return 'Good morning — ready to focus?';
     if (hour < 17) return 'Good afternoon — let\'s dive in';
     return 'Good evening — time for deep work';
@@ -214,7 +219,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('How focused were you?', style: AppTextStyles.titleSmall),
+            const Text('How focused were you?',
+                style: AppTextStyles.titleSmall),
             const SizedBox(height: AppSpacingTokens.md),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -332,7 +338,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             itemCount: recentSessions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: AppSpacingTokens.sm),
+            separatorBuilder: (_, __) =>
+                const SizedBox(width: AppSpacingTokens.sm),
             itemBuilder: (context, index) => _SessionCard(
               session: recentSessions[index],
             )
@@ -509,46 +516,91 @@ class _SessionSettingsSheet extends ConsumerWidget {
 
   Widget _buildHabitLink(BuildContext context, WidgetRef ref) {
     final state = ref.watch(focusControllerProvider);
+    final habits = ref.watch(habitsProvider);
+    final nonArchivedHabits = habits.where((h) => !h.isArchived).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Link to Habit (optional)', style: AppTextStyles.titleSmall),
         const SizedBox(height: AppSpacingTokens.sm),
-        TextFormField(
-          initialValue: state.selectedHabitId,
-          decoration: const InputDecoration(
-            labelText: 'Habit ID',
-            hintText: 'Enter habit ID to link this session',
-            prefixIcon: Icon(Icons.link_outlined),
+        if (nonArchivedHabits.isEmpty)
+          Text(
+            'No habits available. Create one on the Habits screen.',
+            style: AppTextStyles.bodySmall
+                .copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          )
+        else
+          Wrap(
+            spacing: AppSpacingTokens.sm,
+            runSpacing: AppSpacingTokens.sm,
+            children: [
+              GlassPill(
+                label: 'No habit',
+                icon: LucideIcons.link,
+                selected: state.selectedHabitId == null,
+                accent: Theme.of(context).colorScheme.primary,
+                onTap: () => ref
+                    .read(focusControllerProvider.notifier)
+                    .setSelectedHabit(null),
+              ),
+              for (final habit in nonArchivedHabits)
+                GlassPill(
+                  label: habit.title,
+                  icon: habit.categoryIcon,
+                  selected: state.selectedHabitId == habit.id,
+                  accent: habit.categoryColorFor(Theme.of(context).brightness),
+                  onTap: () => ref
+                      .read(focusControllerProvider.notifier)
+                      .setSelectedHabit(habit.id),
+                ),
+            ],
           ),
-          onChanged: (v) => ref
-              .read(focusControllerProvider.notifier)
-              .setSelectedHabit(v.isEmpty ? null : v),
-        ),
       ],
     );
   }
 
   Widget _buildProjectName(BuildContext context, WidgetRef ref) {
     final state = ref.watch(focusControllerProvider);
+    final projects = ref.watch(projectsProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Project Name (optional)', style: AppTextStyles.titleSmall),
+        const Text('Project (optional)', style: AppTextStyles.titleSmall),
         const SizedBox(height: AppSpacingTokens.sm),
-        TextFormField(
-          initialValue: state.projectName,
-          decoration: const InputDecoration(
-            labelText: 'Project',
-            hintText: 'e.g., Flutter App, Writing, Learning',
-            prefixIcon: Icon(Icons.folder_outlined),
+        if (projects.isEmpty)
+          Text(
+            'No projects available. Create one on the Projects screen.',
+            style: AppTextStyles.bodySmall
+                .copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          )
+        else
+          Wrap(
+            spacing: AppSpacingTokens.sm,
+            runSpacing: AppSpacingTokens.sm,
+            children: [
+              GlassPill(
+                label: 'No project',
+                icon: LucideIcons.folder,
+                selected: state.projectName == null,
+                accent: Theme.of(context).colorScheme.primary,
+                onTap: () => ref
+                    .read(focusControllerProvider.notifier)
+                    .setProjectName(null),
+              ),
+              for (final project in projects)
+                GlassPill(
+                  label: project.title,
+                  icon: LucideIcons.folder,
+                  selected: state.projectName == project.title,
+                  accent: Theme.of(context).colorScheme.primary,
+                  onTap: () => ref
+                      .read(focusControllerProvider.notifier)
+                      .setProjectName(project.title),
+                ),
+            ],
           ),
-          onChanged: (v) => ref
-              .read(focusControllerProvider.notifier)
-              .setProjectName(v.isEmpty ? null : v),
-        ),
       ],
     );
   }
@@ -636,9 +688,7 @@ class _SessionCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppRadiusTokens.sm),
                   ),
                   child: Icon(
-                    isWork
-                        ? Icons.center_focus_strong_rounded
-                        : Icons.timer_outlined,
+                    isWork ? LucideIcons.crosshair : LucideIcons.timer,
                     size: 16,
                     color: accent,
                   ),

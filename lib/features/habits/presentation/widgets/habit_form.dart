@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../../domain/entities/habit.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_theme.dart';
@@ -11,6 +12,7 @@ import '../../../../app/widgets/glow_button.dart';
 import '../../../../app/widgets/pill_chip.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/category_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class HabitForm extends ConsumerStatefulWidget {
   final Habit? habit;
@@ -122,18 +124,18 @@ class _HabitFormState extends ConsumerState<HabitForm> {
                   ),
                   Row(
                     children: [
-Text(
-                    isEditing ? 'Edit Habit' : 'New Habit',
-                    style: AppTextStyles.headlineSmall
-                        .copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  const Spacer(),
-                  GlowIconButton(
-                    icon: Icons.close_rounded,
-                    accent: theme.colorScheme.onSurfaceVariant,
-                    size: 40,
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
+                      Text(
+                        isEditing ? 'Edit Habit' : 'New Habit',
+                        style: AppTextStyles.headlineSmall
+                            .copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const Spacer(),
+                      GlowIconButton(
+                        icon: LucideIcons.x,
+                        accent: theme.colorScheme.onSurfaceVariant,
+                        size: 40,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
                     ],
                   ),
                   const SizedBox(height: AppSpacingTokens.lg),
@@ -181,7 +183,7 @@ Text(
       decoration: const InputDecoration(
         labelText: 'Habit Title',
         hintText: 'e.g., Morning meditation, Daily exercise',
-        prefixIcon: Icon(Icons.flag_outlined),
+        prefixIcon: Icon(LucideIcons.flag),
       ),
       // `maxLength` was only validated, never declared, so the field never
       // enforced or displayed the 100-character limit it claimed to have.
@@ -205,7 +207,7 @@ Text(
       decoration: const InputDecoration(
         labelText: 'Description (optional)',
         hintText: 'Why is this habit important to you?',
-        prefixIcon: Icon(Icons.description_outlined),
+        prefixIcon: Icon(LucideIcons.fileText),
         alignLabelWithHint: true,
       ),
       maxLines: 3,
@@ -231,7 +233,7 @@ Text(
       decoration: const InputDecoration(
         labelText: 'Cue / Trigger (optional)',
         hintText: 'e.g., After brushing teeth, When I open my laptop',
-        prefixIcon: Icon(Icons.lightbulb_outline),
+        prefixIcon: Icon(LucideIcons.lightbulb),
       ),
       textInputAction: TextInputAction.next,
     );
@@ -242,7 +244,7 @@ Text(
       label: 'Frequency',
       options: AppConstants.frequencies,
       selected: _frequency,
-      accentFor: (_) => AppColors.neonCyan,
+      accentFor: (_) => AppColors.accentPrimary,
       onSelected: (frequency) => setState(() {
         _frequency = frequency;
         if (frequency != AppConstants.frequencyCustom) {
@@ -275,7 +277,7 @@ Text(
             return GlassPill(
               label: days[index],
               selected: isSelected,
-              accent: AppColors.radiantViolet,
+              accent: AppColors.accentDeep,
               onTap: () {
                 setState(() {
                   if (isSelected) {
@@ -294,7 +296,7 @@ Text(
             child: Row(
               children: [
                 Icon(
-                  Icons.info_outline_rounded,
+                  LucideIcons.info,
                   size: 14,
                   color: theme.colorScheme.error,
                 ),
@@ -322,10 +324,10 @@ Text(
       // Morning is warm, afternoon neutral, evening violet: the accent carries
       // the meaning of the slot without having to read the label.
       accentFor: (time) => switch (time) {
-        'Morning' => AppColors.coralOrange,
-        'Afternoon' => AppColors.neonCyan,
-        'Evening' => AppColors.radiantViolet,
-        _ => AppColors.neonCyan,
+        'Morning' => AppColors.accentWarm,
+        'Afternoon' => AppColors.accentPrimary,
+        'Evening' => AppColors.accentDeep,
+        _ => AppColors.accentPrimary,
       },
       iconFor: _getTimeIcon,
       onSelected: (time) => setState(() => _timeOfDay = time),
@@ -385,7 +387,7 @@ Text(
             decoration: const InputDecoration(
               labelText: 'Target Count',
               hintText: '1',
-              prefixIcon: Icon(Icons.format_list_numbered_outlined),
+              prefixIcon: Icon(LucideIcons.listOrdered),
             ),
             keyboardType: TextInputType.number,
             onChanged: (value) => _targetCount = int.tryParse(value) ?? 1,
@@ -403,7 +405,7 @@ Text(
             decoration: const InputDecoration(
               labelText: 'Duration (min)',
               hintText: '0',
-              prefixIcon: Icon(Icons.timer_outlined),
+              prefixIcon: Icon(LucideIcons.timer),
             ),
             keyboardType: TextInputType.number,
             onChanged: (value) =>
@@ -424,7 +426,7 @@ Text(
 
     return GlowButton(
       label: isEditing ? 'Save Changes' : 'Create Habit',
-      icon: isEditing ? Icons.save_rounded : Icons.add_rounded,
+      icon: isEditing ? LucideIcons.save : LucideIcons.plus,
       accent: _getCategoryColor(_category),
       width: double.infinity,
       onPressed: _save,
@@ -454,7 +456,7 @@ Text(
           targetDuration: Duration(minutes: _targetDurationMinutes),
           cue: _cueController.text.trim(),
           sortOrder: _sortOrder,
-          updatedAt: DateTime.now(),
+          updatedAt: AppClock.now(),
         ) ??
         Habit.create(
           title: _titleController.text.trim(),
@@ -476,18 +478,18 @@ Text(
       CategoryType.fromString(category).color;
 
   IconData _getCategoryIcon(String category) =>
-      CategoryType.tryFromString(category)?.icon ?? Icons.star_outline;
+      CategoryType.tryFromString(category)?.icon ?? LucideIcons.star;
 
   IconData _getTimeIcon(String time) {
     switch (time) {
       case 'Morning':
-        return Icons.wb_sunny_outlined;
+        return LucideIcons.sun;
       case 'Afternoon':
-        return Icons.wb_sunny_outlined;
+        return LucideIcons.sun;
       case 'Evening':
-        return Icons.nights_stay_outlined;
+        return LucideIcons.moon;
       default:
-        return Icons.access_time_outlined;
+        return LucideIcons.clock;
     }
   }
 }

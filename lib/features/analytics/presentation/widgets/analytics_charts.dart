@@ -8,6 +8,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../../core/extensions/date_extensions.dart';
 import '../../domain/analytics_data.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class CategoryBarChart extends StatelessWidget {
   final Map<String, int> data;
@@ -298,7 +299,7 @@ class CorrelationScatterChart extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.scatter_plot_outlined,
+            Icon(LucideIcons.scatterChart,
                 size: 48, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text('No correlation data available',
@@ -388,7 +389,7 @@ class DistributionPieChart extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.pie_chart_outline,
+            Icon(LucideIcons.pieChart,
                 size: 48, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text('No $label data',
@@ -511,7 +512,7 @@ class TrendLineChart extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.show_chart_outlined,
+            Icon(LucideIcons.chartNoAxesColumn,
                 size: 48, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text('No $label data',

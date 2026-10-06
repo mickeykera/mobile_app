@@ -93,6 +93,12 @@ class AppTheme {
       textTheme: textTheme,
       scaffoldBackgroundColor: colorScheme.surface,
 
+      // The explicit `textTheme` above already sets this on all fifteen styles,
+      // but the theme-level family is what catches anything Material builds for
+      // itself - a default text selection menu, a date picker header, a
+      // tooltip - which never goes through `AppTextStyles`.
+      fontFamily: AppTextStyles.fontFamily,
+
       // The app paints its own gradient headers on most screens, so the default
       // surface tint is only ever a fallback.
       canvasColor: colorScheme.surface,
@@ -145,8 +151,8 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadiusTokens.lg),
         ),
-        titleTextStyle: AppTextStyles.headlineSmall
-            .copyWith(color: colorScheme.onSurface),
+        titleTextStyle:
+            AppTextStyles.headlineSmall.copyWith(color: colorScheme.onSurface),
         contentTextStyle: AppTextStyles.bodyMedium
             .copyWith(color: colorScheme.onSurfaceVariant),
       ),
@@ -284,8 +290,8 @@ class AppTheme {
 
       listTileTheme: ListTileThemeData(
         iconColor: colorScheme.onSurfaceVariant,
-        titleTextStyle: AppTextStyles.titleMedium
-            .copyWith(color: colorScheme.onSurface),
+        titleTextStyle:
+            AppTextStyles.titleMedium.copyWith(color: colorScheme.onSurface),
         subtitleTextStyle: AppTextStyles.bodySmall
             .copyWith(color: colorScheme.onSurfaceVariant),
         shape: RoundedRectangleBorder(
@@ -296,8 +302,8 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.cardFill(colorScheme, opacity: 0.96),
-        contentTextStyle: AppTextStyles.bodyMedium
-            .copyWith(color: colorScheme.onSurface),
+        contentTextStyle:
+            AppTextStyles.bodyMedium.copyWith(color: colorScheme.onSurface),
         actionTextColor: colorScheme.primary,
         elevation: 0,
         shape: const StadiumBorder(),
@@ -310,8 +316,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppRadiusTokens.sm),
           border: Border.all(color: AppColors.hairline(colorScheme)),
         ),
-        textStyle: AppTextStyles.labelSmall
-            .copyWith(color: colorScheme.onSurface),
+        textStyle:
+            AppTextStyles.labelSmall.copyWith(color: colorScheme.onSurface),
       ),
 
       sliderTheme: SliderThemeData(
@@ -374,33 +380,31 @@ class AppTheme {
 
   static TextTheme _textThemeFor(ColorScheme scheme) {
     return TextTheme(
-      displayLarge: AppTextStyles.displayLarge
-          .copyWith(color: scheme.onSurface),
-      displayMedium: AppTextStyles.displayMedium
-          .copyWith(color: scheme.onSurface),
+      displayLarge:
+          AppTextStyles.displayLarge.copyWith(color: scheme.onSurface),
+      displayMedium:
+          AppTextStyles.displayMedium.copyWith(color: scheme.onSurface),
       displaySmall:
           AppTextStyles.displaySmall.copyWith(color: scheme.onSurface),
-      headlineLarge: AppTextStyles.headlineLarge
-          .copyWith(color: scheme.onSurface),
-      headlineMedium: AppTextStyles.headlineMedium
-          .copyWith(color: scheme.onSurface),
+      headlineLarge:
+          AppTextStyles.headlineLarge.copyWith(color: scheme.onSurface),
+      headlineMedium:
+          AppTextStyles.headlineMedium.copyWith(color: scheme.onSurface),
       headlineSmall:
           AppTextStyles.headlineSmall.copyWith(color: scheme.onSurface),
       titleLarge: AppTextStyles.titleLarge.copyWith(color: scheme.onSurface),
-      titleMedium:
-          AppTextStyles.titleMedium.copyWith(color: scheme.onSurface),
+      titleMedium: AppTextStyles.titleMedium.copyWith(color: scheme.onSurface),
       titleSmall: AppTextStyles.titleSmall.copyWith(color: scheme.onSurface),
-      bodyLarge:
-          AppTextStyles.bodyLarge.copyWith(color: scheme.onSurface),
-      bodyMedium: AppTextStyles.bodyMedium
-          .copyWith(color: scheme.onSurfaceVariant),
-      bodySmall: AppTextStyles.bodySmall
-          .copyWith(color: scheme.onSurfaceVariant),
+      bodyLarge: AppTextStyles.bodyLarge.copyWith(color: scheme.onSurface),
+      bodyMedium:
+          AppTextStyles.bodyMedium.copyWith(color: scheme.onSurfaceVariant),
+      bodySmall:
+          AppTextStyles.bodySmall.copyWith(color: scheme.onSurfaceVariant),
       labelLarge: AppTextStyles.labelLarge.copyWith(color: scheme.onSurface),
-      labelMedium: AppTextStyles.labelMedium
-          .copyWith(color: scheme.onSurfaceVariant),
-      labelSmall: AppTextStyles.labelSmall
-          .copyWith(color: scheme.onSurfaceVariant),
+      labelMedium:
+          AppTextStyles.labelMedium.copyWith(color: scheme.onSurfaceVariant),
+      labelSmall:
+          AppTextStyles.labelSmall.copyWith(color: scheme.onSurfaceVariant),
     );
   }
 }

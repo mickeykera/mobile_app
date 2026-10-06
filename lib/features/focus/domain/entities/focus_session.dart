@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../../../../core/utils/id_generator.dart';
 
 part 'focus_session.freezed.dart';
@@ -23,6 +24,9 @@ abstract class FocusSession with _$FocusSession {
     Duration? accumulatedBreakTime,
     String? habitId,
     String? projectName,
+    String? taskId,
+    String? projectId,
+    String? outcome,
     int? focusRating,
     String? reflectionNotes,
     required bool isActive,
@@ -40,8 +44,11 @@ abstract class FocusSession with _$FocusSession {
     int sessionsBeforeLongBreak = 4,
     String? habitId,
     String? projectName,
+    String? taskId,
+    String? projectId,
+    String? outcome,
   }) {
-    final now = DateTime.now();
+    final now = AppClock.now();
     return FocusSession(
       id: IdGenerator.generateSessionId(),
       mode: mode,
@@ -64,6 +71,9 @@ abstract class FocusSession with _$FocusSession {
       accumulatedBreakTime: Duration.zero,
       habitId: habitId,
       projectName: projectName,
+      taskId: taskId,
+      projectId: projectId,
+      outcome: outcome,
     );
   }
 
@@ -76,14 +86,14 @@ abstract class FocusSession with _$FocusSession {
   Duration get elapsedWorkTime {
     if (accumulatedWorkTime == null) return Duration.zero;
     if (isPaused || !isActive || isBreak) return accumulatedWorkTime!;
-    return accumulatedWorkTime! + DateTime.now().difference(startedAt);
+    return accumulatedWorkTime! + AppClock.now().difference(startedAt);
   }
 
   Duration get elapsedBreakTime {
     if (accumulatedBreakTime == null) return Duration.zero;
     if (isPaused || !isActive || !isBreak) return accumulatedBreakTime!;
     return accumulatedBreakTime! +
-        DateTime.now().difference(pausedAt ?? startedAt);
+        AppClock.now().difference(pausedAt ?? startedAt);
   }
 
   Duration get currentPhaseElapsed {
@@ -120,7 +130,7 @@ abstract class FocusSession with _$FocusSession {
       isActive: true,
       isPaused: false,
       isBreak: false,
-      startedAt: DateTime.now(),
+      startedAt: AppClock.now(),
       accumulatedWorkTime: Duration.zero,
       accumulatedBreakTime: Duration.zero,
     );
@@ -130,9 +140,9 @@ abstract class FocusSession with _$FocusSession {
     return copyWith(
       isBreak: true,
       isPaused: false,
-      pausedAt: DateTime.now(),
+      pausedAt: AppClock.now(),
       accumulatedWorkTime: elapsedWorkTime,
-      // Reset the break counter: `elapsedBreakTime` adds `DateTime.now() -
+      // Reset the break counter: `elapsedBreakTime` adds `AppClock.now() -
       // pausedAt` on top of `accumulatedBreakTime`, so keeping the previous
       // break's value here would make the second break start already overdue.
       accumulatedBreakTime: Duration.zero,
@@ -143,7 +153,7 @@ abstract class FocusSession with _$FocusSession {
     if (isPaused) return this;
     return copyWith(
       isPaused: true,
-      pausedAt: DateTime.now(),
+      pausedAt: AppClock.now(),
       accumulatedWorkTime: isBreak ? accumulatedWorkTime : elapsedWorkTime,
       accumulatedBreakTime: isBreak ? elapsedBreakTime : accumulatedBreakTime,
     );
@@ -153,7 +163,7 @@ abstract class FocusSession with _$FocusSession {
     if (!isPaused) return this;
     return copyWith(
       isPaused: false,
-      startedAt: DateTime.now(),
+      startedAt: AppClock.now(),
       pausedAt: null,
     );
   }
@@ -166,7 +176,7 @@ abstract class FocusSession with _$FocusSession {
         isPaused: false,
         accumulatedBreakTime: Duration.zero,
         accumulatedWorkTime: Duration.zero,
-        startedAt: DateTime.now(),
+        startedAt: AppClock.now(),
       );
     } else {
       final newCompletedSessions = completedSessions + 1;
@@ -178,11 +188,11 @@ abstract class FocusSession with _$FocusSession {
         isPaused: false,
         accumulatedWorkTime: Duration.zero,
         accumulatedBreakTime: Duration.zero,
-        pausedAt: DateTime.now(),
+        pausedAt: AppClock.now(),
         // Rebase the clock: the finished work minutes are already folded into
         // `totalWorkMinutes`, so leaving `startedAt` in the past would let
         // `endSession()` add the very same minutes a second time.
-        startedAt: DateTime.now(),
+        startedAt: AppClock.now(),
       );
     }
   }
@@ -191,7 +201,7 @@ abstract class FocusSession with _$FocusSession {
     return copyWith(
       isActive: false,
       isPaused: false,
-      endedAt: DateTime.now(),
+      endedAt: AppClock.now(),
       focusRating: focusRating,
       reflectionNotes: reflectionNotes,
       totalWorkMinutes: totalWorkMinutes + elapsedWorkTime.inMinutes,

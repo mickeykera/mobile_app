@@ -32,6 +32,9 @@ mixin _$FocusSession {
   Duration? get accumulatedBreakTime => throw _privateConstructorUsedError;
   String? get habitId => throw _privateConstructorUsedError;
   String? get projectName => throw _privateConstructorUsedError;
+  String? get taskId => throw _privateConstructorUsedError;
+  String? get projectId => throw _privateConstructorUsedError;
+  String? get outcome => throw _privateConstructorUsedError;
   int? get focusRating => throw _privateConstructorUsedError;
   String? get reflectionNotes => throw _privateConstructorUsedError;
   bool get isActive => throw _privateConstructorUsedError;
@@ -66,6 +69,9 @@ abstract class $FocusSessionCopyWith<$Res> {
       Duration? accumulatedBreakTime,
       String? habitId,
       String? projectName,
+      String? taskId,
+      String? projectId,
+      String? outcome,
       int? focusRating,
       String? reflectionNotes,
       bool isActive,
@@ -102,6 +108,9 @@ class _$FocusSessionCopyWithImpl<$Res, $Val extends FocusSession>
     Object? accumulatedBreakTime = freezed,
     Object? habitId = freezed,
     Object? projectName = freezed,
+    Object? taskId = freezed,
+    Object? projectId = freezed,
+    Object? outcome = freezed,
     Object? focusRating = freezed,
     Object? reflectionNotes = freezed,
     Object? isActive = null,
@@ -173,6 +182,18 @@ class _$FocusSessionCopyWithImpl<$Res, $Val extends FocusSession>
           ? _value.projectName
           : projectName // ignore: cast_nullable_to_non_nullable
               as String?,
+      taskId: freezed == taskId
+          ? _value.taskId
+          : taskId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      projectId: freezed == projectId
+          ? _value.projectId
+          : projectId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      outcome: freezed == outcome
+          ? _value.outcome
+          : outcome // ignore: cast_nullable_to_non_nullable
+              as String?,
       focusRating: freezed == focusRating
           ? _value.focusRating
           : focusRating // ignore: cast_nullable_to_non_nullable
@@ -222,6 +243,9 @@ abstract class _$$FocusSessionImplCopyWith<$Res>
       Duration? accumulatedBreakTime,
       String? habitId,
       String? projectName,
+      String? taskId,
+      String? projectId,
+      String? outcome,
       int? focusRating,
       String? reflectionNotes,
       bool isActive,
@@ -256,6 +280,9 @@ class __$$FocusSessionImplCopyWithImpl<$Res>
     Object? accumulatedBreakTime = freezed,
     Object? habitId = freezed,
     Object? projectName = freezed,
+    Object? taskId = freezed,
+    Object? projectId = freezed,
+    Object? outcome = freezed,
     Object? focusRating = freezed,
     Object? reflectionNotes = freezed,
     Object? isActive = null,
@@ -327,6 +354,18 @@ class __$$FocusSessionImplCopyWithImpl<$Res>
           ? _value.projectName
           : projectName // ignore: cast_nullable_to_non_nullable
               as String?,
+      taskId: freezed == taskId
+          ? _value.taskId
+          : taskId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      projectId: freezed == projectId
+          ? _value.projectId
+          : projectId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      outcome: freezed == outcome
+          ? _value.outcome
+          : outcome // ignore: cast_nullable_to_non_nullable
+              as String?,
       focusRating: freezed == focusRating
           ? _value.focusRating
           : focusRating // ignore: cast_nullable_to_non_nullable
@@ -371,6 +410,9 @@ class _$FocusSessionImpl extends _FocusSession {
       this.accumulatedBreakTime,
       this.habitId,
       this.projectName,
+      this.taskId,
+      this.projectId,
+      this.outcome,
       this.focusRating,
       this.reflectionNotes,
       required this.isActive,
@@ -411,6 +453,12 @@ class _$FocusSessionImpl extends _FocusSession {
   @override
   final String? projectName;
   @override
+  final String? taskId;
+  @override
+  final String? projectId;
+  @override
+  final String? outcome;
+  @override
   final int? focusRating;
   @override
   final String? reflectionNotes;
@@ -423,7 +471,7 @@ class _$FocusSessionImpl extends _FocusSession {
 
   @override
   String toString() {
-    return 'FocusSession(id: $id, mode: $mode, workDurationMinutes: $workDurationMinutes, breakDurationMinutes: $breakDurationMinutes, longBreakDurationMinutes: $longBreakDurationMinutes, sessionsBeforeLongBreak: $sessionsBeforeLongBreak, completedSessions: $completedSessions, totalWorkMinutes: $totalWorkMinutes, totalBreakMinutes: $totalBreakMinutes, startedAt: $startedAt, endedAt: $endedAt, pausedAt: $pausedAt, accumulatedWorkTime: $accumulatedWorkTime, accumulatedBreakTime: $accumulatedBreakTime, habitId: $habitId, projectName: $projectName, focusRating: $focusRating, reflectionNotes: $reflectionNotes, isActive: $isActive, isPaused: $isPaused, isBreak: $isBreak)';
+    return 'FocusSession(id: $id, mode: $mode, workDurationMinutes: $workDurationMinutes, breakDurationMinutes: $breakDurationMinutes, longBreakDurationMinutes: $longBreakDurationMinutes, sessionsBeforeLongBreak: $sessionsBeforeLongBreak, completedSessions: $completedSessions, totalWorkMinutes: $totalWorkMinutes, totalBreakMinutes: $totalBreakMinutes, startedAt: $startedAt, endedAt: $endedAt, pausedAt: $pausedAt, accumulatedWorkTime: $accumulatedWorkTime, accumulatedBreakTime: $accumulatedBreakTime, habitId: $habitId, projectName: $projectName, taskId: $taskId, projectId: $projectId, outcome: $outcome, focusRating: $focusRating, reflectionNotes: $reflectionNotes, isActive: $isActive, isPaused: $isPaused, isBreak: $isBreak)';
   }
 
   @override
@@ -461,6 +509,10 @@ class _$FocusSessionImpl extends _FocusSession {
             (identical(other.habitId, habitId) || other.habitId == habitId) &&
             (identical(other.projectName, projectName) ||
                 other.projectName == projectName) &&
+            (identical(other.taskId, taskId) || other.taskId == taskId) &&
+            (identical(other.projectId, projectId) ||
+                other.projectId == projectId) &&
+            (identical(other.outcome, outcome) || other.outcome == outcome) &&
             (identical(other.focusRating, focusRating) ||
                 other.focusRating == focusRating) &&
             (identical(other.reflectionNotes, reflectionNotes) ||
@@ -491,6 +543,9 @@ class _$FocusSessionImpl extends _FocusSession {
         accumulatedBreakTime,
         habitId,
         projectName,
+        taskId,
+        projectId,
+        outcome,
         focusRating,
         reflectionNotes,
         isActive,
@@ -523,6 +578,9 @@ abstract class _FocusSession extends FocusSession {
       final Duration? accumulatedBreakTime,
       final String? habitId,
       final String? projectName,
+      final String? taskId,
+      final String? projectId,
+      final String? outcome,
       final int? focusRating,
       final String? reflectionNotes,
       required final bool isActive,
@@ -562,6 +620,12 @@ abstract class _FocusSession extends FocusSession {
   String? get habitId;
   @override
   String? get projectName;
+  @override
+  String? get taskId;
+  @override
+  String? get projectId;
+  @override
+  String? get outcome;
   @override
   int? get focusRating;
   @override

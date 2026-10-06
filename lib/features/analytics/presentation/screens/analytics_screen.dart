@@ -15,6 +15,7 @@ import '../../../../app/theme/text_styles.dart';
 import '../../../../app/widgets/app_empty_state.dart';
 import '../../../../app/widgets/pill_chip.dart';
 import '../../../../core/constants/app_constants.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
@@ -55,8 +56,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               hasScrollBody: false,
               child: AppEmptyState(
                 icon: state.error != null
-                    ? Icons.error_outline
-                    : Icons.insights_rounded,
+                    ? LucideIcons.circleAlert
+                    : LucideIcons.lightbulb,
                 title: state.error != null
                     ? 'Could not load insights'
                     : 'No data yet',
@@ -83,20 +84,20 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               sliver: SliverList.separated(
                 itemCount: sectionCount,
                 separatorBuilder: (_, __) => const SizedBox(height: 24),
-                itemBuilder: (context, index) => _buildSection(context, index,
-                    state, controller)
+                itemBuilder: (context, index) => _buildSection(
+                        context, index, state, controller)
                     // Staggered entrance. The cap matters: with the long
                     // analytics list a linear delay would leave the eighth
                     // section waiting over a second to appear, which reads as a
                     // stall rather than as choreography.
                     .animate()
-                        .fadeIn(
-                          delay: Duration(
-                            milliseconds: (index * 55).clamp(0, 400),
-                          ),
-                          duration: AppAnimationTokens.slow,
-                        )
-                        .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
+                    .fadeIn(
+                      delay: Duration(
+                        milliseconds: (index * 55).clamp(0, 400),
+                      ),
+                      duration: AppAnimationTokens.slow,
+                    )
+                    .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
               ),
             ),
         ],
@@ -126,8 +127,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           elevation: 0,
           titleSpacing: AppSpacingTokens.lg,
           title: ShaderMask(
-            shaderCallback: AppGradients.action(colorScheme.primary)
-                .createShader,
+            shaderCallback:
+                AppGradients.action(colorScheme.primary).createShader,
             child: Text(
               'Analytics',
               style: AppTextStyles.headlineSmall.copyWith(color: Colors.white),
@@ -168,20 +169,24 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                       Row(
                         children: [
                           _buildStatCard(
-                              'Focus', '${state.totalFocusMinutes} min',
-                              Icons.timer_outlined, AppColors.neonCyan),
+                              'Focus',
+                              '${state.totalFocusMinutes} min',
+                              LucideIcons.timer,
+                              AppColors.accentPrimary),
                           const SizedBox(width: AppSpacingTokens.sm),
                           _buildStatCard(
-                              'Entries', '${state.journalEntriesCount}',
-                              Icons.book_outlined, AppColors.radiantViolet),
+                              'Entries',
+                              '${state.journalEntriesCount}',
+                              LucideIcons.bookOpen,
+                              AppColors.accentDeep),
                           const SizedBox(width: AppSpacingTokens.sm),
                           _buildStatCard(
                             'Mood',
                             state.avgMood > 0
                                 ? state.avgMood.toStringAsFixed(1)
                                 : '—',
-                            Icons.sentiment_satisfied_outlined,
-                            AppColors.coralOrange,
+                            LucideIcons.smile,
+                            AppColors.accentWarm,
                           ),
                         ],
                       ),
@@ -199,12 +204,11 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Widget _buildStatCard(
-      String label, String value, IconData icon, Color color) {
+      String label, String value, IconData icon, Color accent) {
     final theme = Theme.of(context);
-
-    // A translucent well rather than a full card: three of these sit shoulder to
-    // shoulder, and a border on each one made the row read as three boxes
-    // instead of one strip of numbers.
+    // A tinted well matching the accent. The icon uses the full accent colour
+    // (like the pending habit card) so it contrasts with the page surface,
+    // which is the effective backdrop behind the translucent fill.
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(
@@ -212,15 +216,15 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           vertical: AppSpacingTokens.sm + 4,
         ),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: accent.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(AppRadiusTokens.md),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          border: Border.all(color: accent.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: color),
+            Icon(icon, size: 16, color: accent),
             const SizedBox(height: 6),
             // `FittedBox` rather than a smaller font: the value is the thing
             // being read, and 1,240 min must not wrap or ellipsize on a narrow
@@ -262,7 +266,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
             GlassPill(
               label: period,
               selected: state.selectedPeriod == period,
-              accent: AppColors.neonCyan,
+              accent: AppColors.accentPrimary,
               onTap: () => ref
                   .read(analyticsControllerProvider.notifier)
                   .setPeriod(period),
@@ -403,7 +407,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       BuildContext context, AnalyticsState state) {
     // One shared ramp for both charts: previously these two hand-picked
     // colours that overlapped (three of five were identical between them)
-    // and read as pure material red/green rather than app colours.
+    // and read as raw Material red/green rather than app colours.
     return DistributionPieChart(
       data: state.moodDistribution,
       colors: AppColors.ratingScale(Theme.of(context).colorScheme),

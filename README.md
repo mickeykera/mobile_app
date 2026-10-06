@@ -52,6 +52,48 @@ flutter analyze
 flutter test
 ```
 
+## CI/CD
+
+GitHub Actions handles remote builds so you don't need the Android SDK, Xcode, or an Apple Developer account locally.
+
+### On every push/PR to `main` or `master`:
+- **Android**: Runs `flutter analyze`, `flutter test`, builds release APK and AAB.
+  Artifacts: `Ascend-APK` (`.apk`), `Ascend-AAB` (`.aab`).
+- **iOS (macOS runner)**: Runs `flutter analyze`, `flutter test`, builds unsigned `.ipa`.
+  Artifact: `Ascend-iOS-Unsigned` (`.ipa` — **unsigned, not installable on devices**).
+
+### On version tags (`vX.Y.Z`):
+- Runs the same builds and creates a GitHub Release with all three artifacts attached.
+- Signed iOS IPA is only produced if `IOS_SIGNING_ENABLED=true` and signing secrets are configured.
+
+### Artifacts
+All artifacts are uploaded with 14-day retention (90 days for releases) and can be downloaded from the Actions run summary.
+
+### Required secrets (optional)
+| Secret | Purpose |
+|--------|---------|
+| `KEYSTORE_BASE64` | Base64-encoded release keystore for Android |
+| `KEYSTORE_PASSWORD` | Keystore password |
+| `KEY_ALIAS` | Key alias |
+| `IOS_CERT_P12_BASE64` | Base64-encoded iOS distribution certificate |
+| `IOS_CERT_PASSWORD` | Certificate password |
+| `IOS_PROVISION_PROFILE` | Provisioning profile content |
+
+### Required variables (optional)
+| Variable | Purpose |
+|----------|---------|
+| `IOS_SIGNING_ENABLED` | Set to `true` to enable signed iOS build |
+
+### Local validation
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --release
+flutter build appbundle --release
+flutter build ios --release --no-codesign
+```
+
 ## Project layout
 
 ```

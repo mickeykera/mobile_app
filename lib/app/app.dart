@@ -8,6 +8,8 @@ import 'package:ascend/app/theme/text_styles.dart';
 import 'package:ascend/app/router.dart';
 import 'package:ascend/app/widgets/glow_button.dart';
 import 'package:ascend/core/database/database.dart';
+import 'package:ascend/features/recurring/presentation/providers/recurring_providers.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AscendScrollBehavior extends MaterialScrollBehavior {
   /// Android 12+ draws a stretchy overscroll by default, which pulls the whole
@@ -44,18 +46,48 @@ class AscendScrollBehavior extends MaterialScrollBehavior {
   }
 }
 
-class AscendApp extends ConsumerWidget {
+/// Stateful only so Retry can start a *new* `initialize()` future.
+///
+/// This has to be state *here*, not in the error screen. `FutureBuilder`
+/// compares the new `future` against the old one and restarts only if it
+/// changed, so the retry needs to replace the future on the widget that owns
+/// the builder. Rebuilding `_ErrorScreen` alone - which is what a `setState`
+/// inside it does - hands the builder the identical future it already
+/// completed, and the user taps Retry and nothing happens.
+class AscendApp extends ConsumerStatefulWidget {
   const AscendApp({super.key});
 
+  @override
+  ConsumerState<AscendApp> createState() => _AscendAppState();
+}
+
+class _AscendAppState extends ConsumerState<AscendApp> {
   static const _scrollBehavior = AscendScrollBehavior();
 
+  /// Bumped by Retry. The future is derived from it during build rather than
+  /// created in the tap handler - see [_databaseFuture].
+  int _attempt = 0;
+
+  /// The attempt number [_databaseFuture] was built for.
+  int _futureForAttempt = -1;
+  Future<void>? _databaseFuture;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
-    final database = ref.watch(databaseServiceProvider);
+    // The future is created *here*, in the same synchronous pass that hands it
+    // to the `FutureBuilder` below, so the builder can subscribe before the
+    // future completes. Creating it inside the Retry handler instead leaves a
+    // gap: `setState` only schedules a rebuild, so a fast-failing future
+    // completes in a microtask with nothing listening, and Dart reports the
+    // error as unhandled even though the builder is about to handle it.
+    if (_futureForAttempt != _attempt) {
+      _futureForAttempt = _attempt;
+      _databaseFuture = _initialize();
+    }
 
     return FutureBuilder(
-      future: database.initialize(),
+      future: _databaseFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return MaterialApp(
@@ -74,7 +106,10 @@ class AscendApp extends ConsumerWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.system,
             scrollBehavior: _scrollBehavior,
-            home: _ErrorScreen(error: snapshot.error.toString()),
+            home: _ErrorScreen(
+              error: snapshot.error.toString(),
+              onRetry: _retry,
+            ),
             debugShowCheckedModeBanner: false,
           );
         }
@@ -91,6 +126,28 @@ class AscendApp extends ConsumerWidget {
       },
     );
   }
+
+  /// Brings storage up to the current schema, then runs the Habit -> Task
+  /// migration if this install has not completed it.
+  ///
+  /// Both steps are in the one future that gates the first frame, and the order
+  /// matters: the migration resolves its repositories through `ref`, so it must
+  /// be the *same* cached provider instances the UI will later read through.
+  /// Running it first means the repositories hydrate once, already migrated, and
+  /// no two in-memory copies of the habit list can race a write.
+  ///
+  /// The migration short-circuits on a stored marker, so every launch after the
+  /// first costs one key read. See [HabitTaskMigrationRunner] for why this is
+  /// awaited rather than left in the background.
+  Future<void> _initialize() async {
+    await ref.read(databaseServiceProvider).initialize();
+    await ref.read(habitTaskMigrationRunnerProvider).runIfRequired();
+  }
+
+  /// `DatabaseService.initialize` short-circuits on its own `_isInitialized`
+  /// flag, and a failed attempt leaves that flag false, so calling it again
+  /// genuinely re-runs `SharedPreferences.getInstance()`.
+  void _retry() => setState(() => _attempt++);
 }
 
 class _LoadingScreen extends StatelessWidget {
@@ -105,8 +162,8 @@ class _LoadingScreen extends StatelessWidget {
             child: ColoredBox(
               color: AppColors.surfaceDark,
               child: AuroraBackdrop(
-                accentA: AppColors.neonCyan,
-                accentB: AppColors.radiantViolet,
+                accentA: AppColors.accentPrimary,
+                accentB: AppColors.accentDeep,
                 opacity: 0.18,
               ),
             ),
@@ -126,8 +183,8 @@ class _LoadingScreen extends StatelessWidget {
                     children: [
                       Positioned.fill(
                         child: const AuroraBackdrop(
-                          accentA: AppColors.neonCyan,
-                          accentB: AppColors.radiantViolet,
+                          accentA: AppColors.accentPrimary,
+                          accentB: AppColors.accentDeep,
                           opacity: 0.24,
                         )
                             .animate(
@@ -145,22 +202,25 @@ class _LoadingScreen extends StatelessWidget {
                         height: 64,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.neonCyan.withValues(alpha: 0.16),
+                          color:
+                              AppColors.accentPrimary.withValues(alpha: 0.16),
                           border: Border.all(
-                            color: AppColors.neonCyan.withValues(alpha: 0.45),
+                            color:
+                                AppColors.accentPrimary.withValues(alpha: 0.45),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.neonCyan.withValues(alpha: 0.3),
+                              color: AppColors.accentPrimary
+                                  .withValues(alpha: 0.3),
                               blurRadius: 24,
                               spreadRadius: -4,
                             ),
                           ],
                         ),
                         child: const Icon(
-                          Icons.trending_up_rounded,
+                          LucideIcons.trendingUp,
                           size: 32,
-                          color: AppColors.neonCyan,
+                          color: AppColors.accentPrimary,
                         ),
                       ),
                     ],
@@ -169,7 +229,7 @@ class _LoadingScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacingTokens.lg),
                 ShaderMask(
                   shaderCallback:
-                      AppGradients.action(AppColors.neonCyan).createShader,
+                      AppGradients.action(AppColors.accentPrimary).createShader,
                   child: const Text(
                     'Ascend',
                     style: TextStyle(
@@ -196,18 +256,15 @@ class _LoadingScreen extends StatelessWidget {
   }
 }
 
-/// Stateful only so Retry can call `setState` and ask the enclosing
-/// `FutureBuilder` to run `database.initialize()` again.
-class _ErrorScreen extends StatefulWidget {
+class _ErrorScreen extends StatelessWidget {
   final String error;
 
-  const _ErrorScreen({required this.error});
+  /// Starts a fresh database attempt. Owned by `_AscendAppState` because only
+  /// it can replace the future the `FutureBuilder` is watching.
+  final VoidCallback onRetry;
 
-  @override
-  State<_ErrorScreen> createState() => _ErrorScreenState();
-}
+  const _ErrorScreen({required this.error, required this.onRetry});
 
-class _ErrorScreenState extends State<_ErrorScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -233,7 +290,7 @@ class _ErrorScreenState extends State<_ErrorScreen> {
                         Positioned.fill(
                           child: AuroraBackdrop(
                             accentA: theme.colorScheme.error,
-                            accentB: AppColors.coralOrange,
+                            accentB: AppColors.accentWarm,
                             opacity: 0.2,
                           ),
                         ),
@@ -242,15 +299,15 @@ class _ErrorScreenState extends State<_ErrorScreen> {
                           height: 60,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: theme.colorScheme.error
-                                .withValues(alpha: 0.16),
+                            color:
+                                theme.colorScheme.error.withValues(alpha: 0.16),
                             border: Border.all(
                               color: theme.colorScheme.error
                                   .withValues(alpha: 0.4),
                             ),
                           ),
                           child: Icon(
-                            Icons.error_outline,
+                            LucideIcons.circleAlert,
                             size: 30,
                             color: theme.colorScheme.error,
                           ),
@@ -278,7 +335,9 @@ class _ErrorScreenState extends State<_ErrorScreen> {
                   const SizedBox(height: AppSpacingTokens.md),
                   // The raw message is kept, but demoted to small monospace in
                   // an inset well: it is diagnostic detail, not the headline,
-                  // and at body size it was the first thing on screen.
+                  // and at body size it was the first thing on screen. The
+                  // generic 'monospace' keyword resolved to a different face per
+                  // platform, so this now names the bundled family directly.
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(AppSpacingTokens.sm + 4),
@@ -291,9 +350,9 @@ class _ErrorScreenState extends State<_ErrorScreen> {
                           BorderRadius.circular(AppRadiusTokens.input),
                     ),
                     child: Text(
-                      widget.error,
+                      error,
                       style: AppTextStyles.bodySmall.copyWith(
-                        fontFamily: 'monospace',
+                        fontFamily: AppTextStyles.monoFontFamily,
                         fontSize: 11,
                         height: 1.4,
                         color: theme.colorScheme.onSurfaceVariant,
@@ -303,16 +362,10 @@ class _ErrorScreenState extends State<_ErrorScreen> {
                   const SizedBox(height: AppSpacingTokens.lg),
                   GlowButton(
                     label: 'Retry',
-                    icon: Icons.refresh_rounded,
+                    icon: LucideIcons.refreshCw,
                     accent: theme.colorScheme.primary,
                     width: double.infinity,
-                    // No navigation callback: `FutureBuilder` re-runs
-                    // `database.initialize()` on the next rebuild of this
-                    // widget, so the retry is just this screen rebuilding. The
-                    // old `pushNamedAndRemoveUntil('/')` pushed a named route
-                    // onto a `MaterialApp` that has no `onGenerateRoute`, which
-                    // threw instead of retrying.
-                    onPressed: () => setState(() {}),
+                    onPressed: onRetry,
                   ),
                 ],
               ),

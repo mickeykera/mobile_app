@@ -27,7 +27,7 @@ class GlassPill extends StatelessWidget {
     this.selected = false,
     this.onTap,
     this.icon,
-    this.accent = AppColors.neonCyan,
+    this.accent = AppColors.accentPrimary,
     this.haptics = true,
   });
 
@@ -86,8 +86,7 @@ class GlassPill extends StatelessWidget {
                         size: 15,
                         color: selected
                             ? accent
-                            : scheme.onSurfaceVariant
-                                .withValues(alpha: 0.75),
+                            : scheme.onSurfaceVariant.withValues(alpha: 0.75),
                       ),
                     ),
                     const SizedBox(width: 6),

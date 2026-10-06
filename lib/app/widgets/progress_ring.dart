@@ -193,8 +193,7 @@ class DayRing extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: value.clamp(0.0, 1.0)),
-      duration:
-          animate ? AppAnimationTokens.medium : Duration.zero,
+      duration: animate ? AppAnimationTokens.medium : Duration.zero,
       curve: Curves.easeOutCubic,
       builder: (context, animated, _) {
         return SizedBox(

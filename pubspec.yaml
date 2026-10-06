@@ -17,6 +17,7 @@ dependencies:
   flutter_animate: ^4.5.0
   fl_chart: ^0.68.0
   shared_preferences: ^2.2.3
+  lucide_icons_flutter: ^3.1.21
 
 dev_dependencies:
   flutter_test:
@@ -29,4 +30,48 @@ dev_dependencies:
   freezed: ^2.5.2
 
 flutter:
+  # Kept: the Material icon font is still the fallback for anything not yet on
+  # Lucide, and it also backs the platform's own text-selection and
+  # copy/cut affordances.
   uses-material-design: true
+
+  # Geist Sans + Geist Mono (SIL Open Font License 1.1, assets/fonts/OFL.txt),
+  # subset to Latin, Latin-1, Latin Extended-A, punctuation, arrows and the
+  # math/currency signs the UI uses. That is 632 KB across ten faces instead of
+  # 1.4 MB for the full 975-glyph originals.
+  #
+  # The subset is not arbitrary. The app renders arbitrary user text — journal
+  # entries and habit names — so Latin-1 and Latin Extended-A stay in, because a
+  # habit called "Café" or "Müller" must not render as tofu boxes. The one
+  # thing deliberately not carried over is full Greek/Cyrillic coverage.
+  #
+  # The `weight:` values here are what Flutter matches on; the upstream files
+  # carry inconsistent internal family names (Geist-Medium.ttf names its family
+  # "Geist Medium", and GeistMono-Medium.ttf claims style "Regular"), so the
+  # declaration below is the authority for both family and weight.
+  fonts:
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/Geist-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Geist-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/Geist-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Geist-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Geist-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Geist-ExtraBold.ttf
+          weight: 800
+    - family: Geist Mono
+      fonts:
+        - asset: assets/fonts/GeistMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/GeistMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/GeistMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/GeistMono-Bold.ttf
+          weight: 700

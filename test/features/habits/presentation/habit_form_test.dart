@@ -41,7 +41,8 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('title and description counters are declared, not just validated', (
+  testWidgets('title and description counters are declared, not just validated',
+      (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
@@ -49,9 +50,8 @@ void main() {
 
     // `TextFormField` does not expose `maxLength`; the underlying `TextField`
     // it builds does, so that is what has to be inspected.
-    final fields = tester
-        .widgetList<TextField>(find.byType(TextField))
-        .toList();
+    final fields =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
 
     final title = fields.firstWhere(
       (f) => f.decoration?.labelText == 'Habit Title',

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ascend/core/utils/app_clock.dart';
 import 'package:ascend/features/habits/domain/entities/habit.dart';
 
 Habit _habit({
@@ -149,6 +150,105 @@ void main() {
     });
   });
 
+  group('Habit snooze and reschedule', () {
+    // 2025-06-11 is a Wednesday.
+    final wednesday = DateTime(2025, 6, 11, 9, 0);
+
+    setUp(() => AppClock.debugSetNow(() => wednesday));
+    tearDown(AppClock.debugResetNow);
+
+    test('an active snooze removes the habit from today and future days', () {
+      final habit = _habit()
+          .copyWith(snoozedUntil: wednesday.add(const Duration(hours: 3)));
+
+      expect(habit.isSnoozed, isTrue);
+      expect(habit.activeSnoozeUntil, isNotNull);
+      expect(habit.isDueOnDate(wednesday), isFalse);
+      expect(
+        habit.isDueOnDate(wednesday.add(const Duration(days: 1))),
+        isFalse,
+      );
+    });
+
+    test('a snooze does not rewrite days already in the past', () {
+      final habit = _habit()
+          .copyWith(snoozedUntil: wednesday.add(const Duration(hours: 3)));
+
+      expect(
+        habit.isDueOnDate(wednesday.subtract(const Duration(days: 1))),
+        isTrue,
+      );
+    });
+
+    test('the habit is due again once the snooze elapses', () {
+      var now = wednesday;
+      AppClock.debugSetNow(() => now);
+      final habit = _habit()
+          .copyWith(snoozedUntil: wednesday.add(const Duration(hours: 3)));
+
+      expect(habit.isDueOnDate(wednesday), isFalse);
+
+      now = wednesday.add(const Duration(hours: 4));
+
+      expect(habit.isSnoozed, isFalse);
+      expect(habit.activeSnoozeUntil, isNull);
+      expect(habit.isDueOnDate(now), isTrue);
+    });
+
+    test('a reschedule suppresses the days before it', () {
+      // Weekdays habit moved to Saturday 2025-06-14.
+      final habit = _habit(frequency: 'Weekdays')
+          .copyWith(dueAt: DateTime(2025, 6, 14, 9));
+
+      expect(habit.isDueOnDate(DateTime(2025, 6, 13)), isFalse,
+          reason: 'Friday is before the new due date');
+    });
+
+    test('a reschedule forces its own day even outside the recurrence', () {
+      final habit = _habit(frequency: 'Weekdays')
+          .copyWith(dueAt: DateTime(2025, 6, 14, 9)); // Saturday
+
+      expect(habit.isDueOnDate(DateTime(2025, 6, 14)), isTrue,
+          reason: 'the rescheduled day is always due');
+    });
+
+    test('recurrence resumes once the rescheduled day is past', () {
+      final habit = _habit(frequency: 'Weekdays')
+          .copyWith(dueAt: DateTime(2025, 6, 14, 9)); // Saturday
+
+      // Sunday is still a non-working day for a Weekdays habit.
+      expect(habit.isDueOnDate(DateTime(2025, 6, 15)), isFalse);
+      // Monday falls back to the normal recurrence.
+      expect(habit.isDueOnDate(DateTime(2025, 6, 16)), isTrue);
+    });
+
+    test('a reschedule does not rewrite days already in the past', () {
+      // Now is Friday; the reschedule targets the coming Monday.
+      AppClock.debugSetNow(() => DateTime(2025, 6, 13, 9));
+      final habit =
+          _habit(frequency: 'Daily').copyWith(dueAt: DateTime(2025, 6, 16, 9));
+
+      expect(habit.isDueOnDate(DateTime(2025, 6, 12)), isTrue,
+          reason: 'yesterday keeps its original recurrence result');
+    });
+
+    test('rescheduling to today forces a habit that is not normally due', () {
+      // A Weekends habit moved onto a Wednesday is due today.
+      final habit = _habit(frequency: 'Weekends').copyWith(dueAt: wednesday);
+
+      expect(habit.isDueOnDate(wednesday), isTrue);
+    });
+
+    test('a snooze until tomorrow stays hidden across the day boundary', () {
+      final habit = _habit()
+          .copyWith(snoozedUntil: DateTime(2025, 6, 12, 9)); // tomorrow 9am
+
+      expect(habit.isDueOnDate(wednesday), isFalse);
+      expect(habit.isDueOnDate(DateTime(2025, 6, 12)), isFalse,
+          reason: 'the hold covers tomorrow until it elapses');
+    });
+  });
+
   group('Habit completion lookup', () {
     test('isCompletedOn only matches the exact day', () {
       final today = DateTime.now();
@@ -163,6 +263,27 @@ void main() {
     test('a habit that was never completed is not completed', () {
       expect(_habit().isCompletedOn(DateTime.now()), isFalse);
       expect(_habit().isCompletedToday, isFalse);
+    });
+  });
+
+  group('Habit relationship links', () {
+    test('default to null', () {
+      final habit = Habit.create(title: 'Read', category: 'Mind');
+      expect(habit.projectId, isNull);
+      expect(habit.goalId, isNull);
+    });
+
+    test('linking preserves identity and scheduling', () {
+      final habit = Habit.create(title: 'Read', category: 'Mind')
+          .copyWith(dueAt: DateTime(2025, 6, 14));
+
+      final linked = habit.copyWith(projectId: 'project_1', goalId: 'goal_1');
+
+      expect(linked.projectId, 'project_1');
+      expect(linked.goalId, 'goal_1');
+      expect(linked.id, habit.id);
+      expect(linked.dueAt, habit.dueAt);
+      expect(linked.frequency, habit.frequency);
     });
   });
 }

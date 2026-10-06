@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/id_generator.dart';
 
@@ -30,7 +31,7 @@ abstract class JournalEntry with _$JournalEntry {
     List<String>? tags,
     String? gratitudeNote,
   }) {
-    final now = DateTime.now();
+    final now = AppClock.now();
     return JournalEntry(
       id: IdGenerator.generateEntryId(),
       type: 'Morning',
@@ -53,7 +54,7 @@ abstract class JournalEntry with _$JournalEntry {
     List<String>? tags,
     String? gratitudeNote,
   }) {
-    final now = DateTime.now();
+    final now = AppClock.now();
     return JournalEntry(
       id: IdGenerator.generateEntryId(),
       type: 'Evening',
@@ -96,22 +97,22 @@ abstract class JournalEntry with _$JournalEntry {
     } else {
       newResponses[prompt] = response;
     }
-    return copyWith(responses: newResponses, updatedAt: DateTime.now());
+    return copyWith(responses: newResponses, updatedAt: AppClock.now());
   }
 
   JournalEntry copyWithMood(int? mood) {
-    return copyWith(moodRating: mood, updatedAt: DateTime.now());
+    return copyWith(moodRating: mood, updatedAt: AppClock.now());
   }
 
   JournalEntry copyWithEnergy(int? energy) {
-    return copyWith(energyRating: energy, updatedAt: DateTime.now());
+    return copyWith(energyRating: energy, updatedAt: AppClock.now());
   }
 
   JournalEntry copyWithTags(List<String>? tags) {
-    return copyWith(tags: tags, updatedAt: DateTime.now());
+    return copyWith(tags: tags, updatedAt: AppClock.now());
   }
 
   JournalEntry copyWithGratitude(String? note) {
-    return copyWith(gratitudeNote: note, updatedAt: DateTime.now());
+    return copyWith(gratitudeNote: note, updatedAt: AppClock.now());
   }
 }

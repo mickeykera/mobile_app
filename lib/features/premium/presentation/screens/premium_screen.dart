@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -19,7 +20,13 @@ class PremiumScreen extends ConsumerStatefulWidget {
   ConsumerState<PremiumScreen> createState() => _PremiumScreenState();
 }
 
+/// Test hook to disable all infinite animations in the premium screen.
+void testDisablePremiumAnimations() =>
+    _PremiumScreenState.debugDisableAnimations = true;
+
 class _PremiumScreenState extends ConsumerState<PremiumScreen> {
+  static bool debugDisableAnimations = false;
+
   @override
   Widget build(BuildContext context) {
     final premiumState = ref.watch(premiumProvider);
@@ -86,8 +93,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       elevation: 0,
       titleSpacing: AppSpacingTokens.lg,
       title: ShaderMask(
-        shaderCallback:
-            AppGradients.action(AppColors.radiantViolet).createShader,
+        shaderCallback: AppGradients.action(AppColors.accentWarm).createShader,
         child: Text(
           'Premium',
           style: AppTextStyles.headlineSmall.copyWith(color: Colors.white),
@@ -117,22 +123,24 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                 children: [
                   const Positioned.fill(
                     child: AuroraBackdrop(
-                      accentA: AppColors.radiantViolet,
-                      accentB: AppColors.neonCyan,
+                      accentA: AppColors.accentWarm,
+                      accentB: AppColors.accentLive,
                       opacity: 0.26,
                     ),
                   ),
                   Center(
                     child: const Icon(
-                      Icons.diamond_rounded,
+                      LucideIcons.gem,
                       size: 72,
-                      color: AppColors.radiantViolet,
+                      color: AppColors.accentWarm,
                     )
                         // A slow shimmer. This is the one place in the app that
                         // loops forever on its own, because it is the one thing
                         // on the screen asking to be bought.
                         .animate(
-                          onPlay: (c) => c.repeat(reverse: true),
+                          onPlay: (_PremiumScreenState.debugDisableAnimations
+                              ? (c) => c
+                              : (c) => c.repeat(reverse: true)),
                         )
                         .scaleXY(
                           begin: 1,
@@ -147,7 +155,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             const SizedBox(height: AppSpacingTokens.md),
             ShaderMask(
               shaderCallback:
-                  AppGradients.action(AppColors.radiantViolet).createShader,
+                  AppGradients.action(AppColors.accentWarm).createShader,
               child: Text(
                 'Unlock Your Full Potential',
                 style: AppTextStyles.headlineMedium.copyWith(
@@ -171,13 +179,16 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   Widget _buildCurrentPlan(BuildContext context, PremiumState state) {
     final theme = Theme.of(context);
     final isPremium = state.isPremium;
-    final accent = isPremium ? AppColors.emerald : AppColors.radiantViolet;
+    final accent = isPremium ? AppColors.accentLive : AppColors.accentWarm;
 
     return GlassCard(
       tint: accent,
       tintOpacity: isPremium ? 0.18 : 0.1,
       padding: const EdgeInsets.all(AppSpacingTokens.lg),
-      child: Row(
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppSpacingTokens.md,
+        runSpacing: AppSpacingTokens.sm,
         children: [
           Container(
             padding: const EdgeInsets.all(AppSpacingTokens.sm + 2),
@@ -187,15 +198,16 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
               border: Border.all(color: accent.withValues(alpha: 0.4)),
             ),
             child: Icon(
-              isPremium ? Icons.diamond_rounded : Icons.lock_outline_rounded,
+              isPremium ? LucideIcons.gem : LucideIcons.lock,
               size: 26,
               color: accent,
             ),
           ),
-          const SizedBox(width: AppSpacingTokens.md),
-          Expanded(
+          SizedBox(
+            width: MediaQuery.of(context).size.width - 120,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // `AnimatedSwitcher` on the plan name: upgrading flips this
                 // label in place, and a hard swap read as a page change.
@@ -234,7 +246,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
           if (!isPremium)
             GlowButton(
               label: 'Upgrade',
-              accent: AppColors.radiantViolet,
+              accent: AppColors.accentWarm,
               height: 40,
               onPressed: () => _showUpgradeSheet(context),
             ),
@@ -252,13 +264,13 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
 
     if (state.isPremium) {
       return const GlassCard(
-        tint: AppColors.emerald,
+        tint: AppColors.accentLive,
         padding: EdgeInsets.all(AppSpacingTokens.lg),
         child: Row(
           children: [
             Icon(
-              Icons.check_circle_rounded,
-              color: AppColors.emerald,
+              LucideIcons.checkCircle2,
+              color: AppColors.accentLive,
               size: 22,
             ),
             SizedBox(width: AppSpacingTokens.sm + 2),
@@ -274,18 +286,20 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     }
 
     return GlassCard(
-      tint: AppColors.radiantViolet,
+      tint: AppColors.accentWarm,
       tintOpacity: 0.14,
       padding: const EdgeInsets.all(AppSpacingTokens.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: 6,
+            runSpacing: 4,
             children: [
               ShaderMask(
                 shaderCallback:
-                    AppGradients.action(AppColors.radiantViolet).createShader,
+                    AppGradients.action(AppColors.accentWarm).createShader,
                 child: Text(
                   '\$4.99',
                   style: AppTextStyles.displaySmall.copyWith(
@@ -293,7 +307,6 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
@@ -303,11 +316,10 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                   ),
                 ),
               ),
-              const Spacer(),
               Text(
                 '\$39.99/year',
                 style: AppTextStyles.labelLarge.copyWith(
-                  color: AppColors.emerald,
+                  color: AppColors.accentLive,
                 ),
               ),
             ],
@@ -322,8 +334,8 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
           const SizedBox(height: AppSpacingTokens.md),
           GlowButton(
             label: 'Upgrade to Premium',
-            icon: Icons.diamond_rounded,
-            accent: AppColors.radiantViolet,
+            icon: LucideIcons.gem,
+            accent: AppColors.accentWarm,
             width: double.infinity,
             height: 54,
             // The only permanently looping animation in the app, and
@@ -368,7 +380,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
               border: Border.all(color: accent.withValues(alpha: 0.3)),
             ),
             child: Icon(
-              unlocked ? feature.icon : Icons.lock_outline_rounded,
+              unlocked ? feature.icon : LucideIcons.lock,
               size: 22,
               color: accent,
             ),
@@ -399,7 +411,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                     else
                       const _PlanTag(
                         label: 'PREMIUM',
-                        color: AppColors.radiantViolet,
+                        color: AppColors.accentWarm,
                       ),
                   ],
                 ),
@@ -453,8 +465,8 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                     Row(
                       children: [
                         const Icon(
-                          Icons.diamond_rounded,
-                          color: AppColors.radiantViolet,
+                          LucideIcons.gem,
+                          color: AppColors.accentWarm,
                           size: 22,
                         ),
                         const SizedBox(width: AppSpacingTokens.sm),
@@ -465,7 +477,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                           ),
                         ),
                         GlowIconButton(
-                          icon: Icons.close_rounded,
+                          icon: LucideIcons.x,
                           accent: theme.colorScheme.onSurfaceVariant,
                           size: 40,
                           onPressed: () => Navigator.pop(context),
@@ -484,24 +496,23 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                       (f) => !f.isFree,
                     ))
                       Padding(
-                        padding:
-                            const EdgeInsets.only(bottom: AppSpacingTokens.sm + 2),
+                        padding: const EdgeInsets.only(
+                            bottom: AppSpacingTokens.sm + 2),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Padding(
                               padding: EdgeInsets.only(top: 1),
                               child: Icon(
-                                Icons.check_rounded,
+                                LucideIcons.check,
                                 size: 17,
-                                color: AppColors.emerald,
+                                color: AppColors.accentLive,
                               ),
                             ),
                             const SizedBox(width: AppSpacingTokens.sm + 2),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     feature.title,
@@ -522,8 +533,8 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                     const SizedBox(height: AppSpacingTokens.md),
                     GlowButton(
                       label: 'Upgrade Now',
-                      icon: Icons.diamond_rounded,
-                      accent: AppColors.radiantViolet,
+                      icon: LucideIcons.gem,
+                      accent: AppColors.accentWarm,
                       width: double.infinity,
                       height: 54,
                       onPressed: () {
@@ -558,12 +569,9 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   }
 
   void _handleUpgrade() {
-    // In a real app, this would trigger the purchase flow.
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Purchase flow would be triggered here')),
+      const SnackBar(content: Text('Purchase flow not yet implemented')),
     );
-    // For demo purposes, we'll simulate a successful upgrade.
-    ref.read(premiumProvider.notifier).upgradeToPremium();
   }
 }
 
@@ -600,42 +608,42 @@ enum _PremiumFeature {
   unlimitedHabits(
     title: 'Unlimited Habits',
     description: 'Create as many habits as you need without limits',
-    icon: Icons.track_changes_rounded,
+    icon: LucideIcons.gitBranch,
     color: AppColors.habitMind,
     isFree: true,
   ),
   advancedAnalytics(
     title: 'Advanced Analytics',
     description: 'Detailed insights, trends, and progress reports',
-    icon: Icons.analytics_rounded,
-    color: AppColors.neonCyan,
+    icon: LucideIcons.barChart2,
+    color: AppColors.accentLive,
     isFree: false,
   ),
   customFocus(
     title: 'Custom Focus Sessions',
     description: 'Create custom durations, intervals, and break patterns',
-    icon: Icons.timer_outlined,
+    icon: LucideIcons.timer,
     color: AppColors.habitCraft,
     isFree: false,
   ),
   dataExport(
     title: 'Data Export & Backup',
     description: 'Export your data as CSV/JSON or backup to cloud',
-    icon: Icons.download_rounded,
+    icon: LucideIcons.download,
     color: AppColors.habitDiscipline,
     isFree: false,
   ),
   cloudSync(
     title: 'Cloud Sync',
     description: 'Sync across all your devices seamlessly',
-    icon: Icons.cloud_sync_rounded,
-    color: AppColors.radiantViolet,
+    icon: LucideIcons.cloud,
+    color: AppColors.accentWarm,
     isFree: false,
   ),
   prioritySupport(
     title: 'Priority Support',
     description: 'Get help faster with dedicated support',
-    icon: Icons.support_agent_rounded,
+    icon: LucideIcons.helpCircle,
     color: AppColors.habitBody,
     isFree: false,
   );

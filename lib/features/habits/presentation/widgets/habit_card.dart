@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,18 +8,21 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../app/theme/text_styles.dart';
 import '../../../../app/widgets/glass_card.dart';
 import '../../../../app/widgets/mini_week_strip.dart';
+import '../../../../app/widgets/pressable.dart';
 import '../../domain/entities/habit.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// A single habit row.
 ///
 /// The surface is a translucent card with a category-coloured wash, the
 /// completion control is a custom animated circle rather than a checkbox, and
-/// the whole card can be swiped to archive or delete.
+/// the whole card can be swiped to complete or undo a completion.
 ///
-/// [onTap] / [onLongPress] open the editor and the options sheet. [onComplete] /
-/// [onUncomplete] drive the completion circle. When [onArchive] or [onDelete] is
-/// supplied the card becomes swipeable; when neither is, it does not, so a
-/// caller cannot accidentally get a swipe target that does nothing.
+/// [onTap] opens the editor. [onLongPress] and [onMoreActions] both open the
+/// options sheet - the trailing button is there because long press is not
+/// discoverable, so the two entry points have to reach the same place.
+/// [onComplete] / [onUncomplete] drive the completion circle, and the swipe
+/// callbacks return whether the dismiss should stand.
 class HabitCard extends StatelessWidget {
   final Habit habit;
   final bool isCompleted;
@@ -28,12 +30,12 @@ class HabitCard extends StatelessWidget {
   final VoidCallback? onComplete;
   final VoidCallback? onUncomplete;
   final VoidCallback? onLongPress;
+  final VoidCallback? onMoreActions;
 
   /// Invoked on a swipe-to-the-start. Returning false cancels the dismiss.
-  final FutureOr<bool> Function()? onArchive;
-
-  /// Invoked on a swipe-to-the-end. Returning false cancels the dismiss.
-  final FutureOr<bool> Function()? onDelete;
+  /// Used for complete/uncomplete actions.
+  final FutureOr<bool> Function()? onSwipeComplete;
+  final FutureOr<bool> Function()? onSwipeUncomplete;
 
   const HabitCard({
     super.key,
@@ -43,21 +45,22 @@ class HabitCard extends StatelessWidget {
     this.onComplete,
     this.onUncomplete,
     this.onLongPress,
-    this.onArchive,
-    this.onDelete,
+    this.onMoreActions,
+    this.onSwipeComplete,
+    this.onSwipeUncomplete,
   });
 
   @override
   Widget build(BuildContext context) {
     final card = _buildCard(context);
 
-    final canSwipe = onArchive != null || onDelete != null;
+    final canSwipe = onSwipeComplete != null || onSwipeUncomplete != null;
     if (!canSwipe) return card;
 
     return _SwipeableHabitCard(
       habit: habit,
-      onArchive: onArchive,
-      onDelete: onDelete,
+      onComplete: onSwipeComplete,
+      onUncomplete: onSwipeUncomplete,
       child: card,
     );
   }
@@ -65,7 +68,7 @@ class HabitCard extends StatelessWidget {
   Widget _buildCard(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final accent = habit.categoryColor;
+    final accent = habit.categoryColorFor(Theme.of(context).brightness);
 
     return Semantics(
       button: true,
@@ -104,6 +107,13 @@ class HabitCard extends StatelessWidget {
               Expanded(child: _buildHabitInfo(context)),
               const SizedBox(width: AppSpacingTokens.sm),
               _buildStreakBadge(context),
+              const SizedBox(width: AppSpacingTokens.sm),
+              // Trailing "more actions" button
+              if (onMoreActions != null)
+                _MoreActionsButton(
+                  habit: habit,
+                  onPressed: onMoreActions!,
+                ),
             ],
           ),
         ),
@@ -114,22 +124,26 @@ class HabitCard extends StatelessWidget {
   Widget _buildHabitInfo(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final accent = habit.categoryColor;
+    final accent = habit.categoryColorFor(Theme.of(context).brightness);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
           children: [
             _CategoryTag(label: habit.category, accent: accent),
-            if (habit.targetDuration.inMinutes > 0) ...[
-              const SizedBox(width: 6),
+            if (habit.targetDuration.inMinutes > 0)
               _MetaTag(
-                icon: Icons.timer_outlined,
+                icon: LucideIcons.timer,
                 label: '${habit.targetDuration.inMinutes} min',
               ),
-            ],
+            // The card stays in the library while snoozed, so it needs to say
+            // why it is missing from Today's workload.
+            if (habit.isSnoozed)
+              const _MetaTag(icon: LucideIcons.clock, label: 'Snoozed'),
           ],
         ),
         const SizedBox(height: AppSpacingTokens.sm - 2),
@@ -139,9 +153,7 @@ class HabitCard extends StatelessWidget {
           duration: AppAnimationTokens.medium,
           curve: Curves.easeOutCubic,
           style: AppTextStyles.titleMedium.copyWith(
-            color: isCompleted
-                ? scheme.onSurfaceVariant
-                : scheme.onSurface,
+            color: isCompleted ? scheme.onSurfaceVariant : scheme.onSurface,
             decoration: isCompleted ? TextDecoration.lineThrough : null,
             decorationColor: scheme.onSurfaceVariant.withValues(alpha: 0.5),
           ),
@@ -213,7 +225,7 @@ class HabitCard extends StatelessWidget {
   Widget _buildStreakBadge(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final accent = habit.categoryColor;
+    final accent = habit.categoryColorFor(Theme.of(context).brightness);
 
     if (habit.currentStreak == 0 && habit.longestStreak == 0) {
       return const SizedBox.shrink();
@@ -243,7 +255,7 @@ class HabitCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.local_fire_department_rounded,
+                LucideIcons.flame,
                 size: 14,
                 color: accent,
               ),
@@ -275,28 +287,28 @@ class HabitCard extends StatelessWidget {
   IconData _timeOfDayIcon(String timeOfDay) {
     switch (timeOfDay) {
       case 'Morning':
-        return Icons.wb_twilight_rounded;
+        return LucideIcons.sunset;
       case 'Afternoon':
-        return Icons.wb_sunny_rounded;
+        return LucideIcons.sun;
       case 'Evening':
-        return Icons.nights_stay_rounded;
+        return LucideIcons.moon;
       default:
-        return Icons.access_time_rounded;
+        return LucideIcons.clock;
     }
   }
 
   IconData _frequencyIcon(String frequency) {
     switch (frequency) {
       case 'Daily':
-        return Icons.repeat_rounded;
+        return LucideIcons.repeat;
       case 'Weekdays':
-        return Icons.calendar_today_rounded;
+        return LucideIcons.calendar;
       case 'Weekends':
-        return Icons.weekend_rounded;
+        return LucideIcons.calendarDays;
       case 'Custom':
-        return Icons.tune_rounded;
+        return LucideIcons.slidersHorizontal;
       default:
-        return Icons.repeat_rounded;
+        return LucideIcons.repeat;
     }
   }
 
@@ -318,18 +330,50 @@ class HabitCard extends StatelessWidget {
   }
 }
 
-/// Wraps the card in a [Dismissible] with rounded, icon-morphing backgrounds.
+/// The trailing "more actions" affordance.
+///
+/// Long press reaches the same options sheet, but long press is invisible until
+/// you already know it exists, so the sheet needs a labelled control too. The
+/// callback comes from the list, which owns the sheet and the dialogs behind it:
+/// a card that built its own sheet had no way to reach the screen's navigator
+/// safely, and ended up deferring its dialog to a post-frame callback.
+class _MoreActionsButton extends StatelessWidget {
+  final Habit habit;
+  final VoidCallback onPressed;
+
+  const _MoreActionsButton({required this.habit, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onPressed,
+      semanticLabel: 'More actions for ${habit.title}',
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacingTokens.xs),
+        child: Icon(
+          LucideIcons.moreHorizontal,
+          size: 20,
+          color: Theme.of(context)
+              .colorScheme
+              .onSurfaceVariant
+              .withValues(alpha: 0.6),
+        ),
+      ),
+    );
+  }
+}
+
 class _SwipeableHabitCard extends StatefulWidget {
   final Habit habit;
-  final FutureOr<bool> Function()? onArchive;
-  final FutureOr<bool> Function()? onDelete;
+  final FutureOr<bool> Function()? onComplete;
+  final FutureOr<bool> Function()? onUncomplete;
   final Widget child;
 
   const _SwipeableHabitCard({
     required this.habit,
     required this.child,
-    this.onArchive,
-    this.onDelete,
+    this.onComplete,
+    this.onUncomplete,
   });
 
   @override
@@ -352,36 +396,45 @@ class _SwipeableHabitCardState extends State<_SwipeableHabitCard> {
 
   @override
   Widget build(BuildContext context) {
+    final canComplete =
+        widget.onComplete != null && !widget.habit.isCompletedToday;
+    final canUncomplete =
+        widget.onUncomplete != null && widget.habit.isCompletedToday;
+    final canSwipe = canComplete || canUncomplete;
+    if (!canSwipe) return widget.child;
+
+    final isCompleted = widget.habit.isCompletedToday;
+    const accent = AppColors.accentWarm; // Green for complete
+
     return Dismissible(
       key: ValueKey('habit-${widget.habit.id}'),
-      background: widget.onArchive == null
-          ? null
-          : _SwipeBackground(
+      background: canComplete
+          ? _SwipeBackground(
               progress: _progress,
               alignment: Alignment.centerLeft,
-              accent: AppColors.habitBody,
-              icon: widget.habit.isArchived
-                  ? Icons.unarchive_rounded
-                  : Icons.archive_rounded,
-              label: widget.habit.isArchived ? 'Unarchive' : 'Archive',
-            ),
-      secondaryBackground: widget.onDelete == null
-          ? null
-          : _SwipeBackground(
-              progress: _progress,
-              alignment: Alignment.centerRight,
-              accent: Theme.of(context).colorScheme.error,
-              icon: Icons.delete_rounded,
-              label: 'Delete',
-            ),
-      // Both handlers must confirm. `confirmDismiss` is async, so a destructive
-      // swipe that the user cancels restores the card without the list ever
-      // having been told to remove it.
+              accent: accent,
+              icon: LucideIcons.check,
+              label: 'Complete',
+            )
+          : canUncomplete
+              ? _SwipeBackground(
+                  progress: _progress,
+                  alignment: Alignment.centerLeft,
+                  accent: AppColors.accentWarm,
+                  icon: LucideIcons.rotateCcw,
+                  label: 'Undo',
+                )
+              : null,
+      secondaryBackground: null, // Right swipe handled by trailing button
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          return await widget.onArchive?.call() ?? false;
+          if (isCompleted) {
+            return await widget.onUncomplete?.call() ?? false;
+          } else {
+            return await widget.onComplete?.call() ?? false;
+          }
         }
-        return await widget.onDelete?.call() ?? false;
+        return false;
       },
       onUpdate: (details) => _progress.value = details.progress,
       child: widget.child,
@@ -541,89 +594,101 @@ class _CompletionToggleState extends State<_CompletionToggle>
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final accent = widget.accent;
-    final ink = AppColors.onColorFor(accent, scheme);
+    // Done is always brand blue, whatever category the habit is. Four category
+    // hues meant four different meanings for one filled circle, so a glance
+    // down the list could not answer "how am I doing" - only "what is this
+    // one". The incomplete ring keeps the category accent, so nothing about
+    // the habit's identity is lost.
+    const doneColor = AppColors.accentPrimary;
+    final ink = AppColors.onColorFor(doneColor, scheme);
 
     return Semantics(
-      checked: widget.isCompleted,
-      button: true,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedBuilder(
-          animation: _pop,
-          builder: (context, child) {
-            // A single tween cannot express this: the brief's
-            // `.scale(begin: Offset(0.8, 0.8), end: Offset(1.1, 1.1))` has to
-            // land on 1.0, not 1.1, or the circle is left permanently 10%
-            // oversized. So squash in, overshoot to 1.12, then settle back to
-            // exactly 1.0. `elasticOut` on the second half is what makes it
-            // read as a bounce rather than a plain ease-out.
-            final scale = _popScale.value;
-            return Transform.scale(scale: scale, child: child);
-          },
-          child: AnimatedContainer(
-            duration: AppAnimationTokens.medium,
-            curve: Curves.easeOutCubic,
-            width: _diameter,
-            height: _diameter,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: widget.isCompleted
-                  ? LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        accent,
-                        Color.lerp(accent, AppColors.radiantViolet, 0.3)!,
-                      ],
-                    )
-                  : null,
-              color: widget.isCompleted ? null : accent.withValues(alpha: 0.08),
-              border: Border.all(
-                color: widget.isCompleted
-                    ? Colors.transparent
-                    : accent.withValues(alpha: 0.45),
-                width: 2,
+        checked: widget.isCompleted,
+        button: true,
+        child: Tooltip(
+          message:
+              widget.isCompleted ? 'Mark as incomplete' : 'Mark as complete',
+          child: GestureDetector(
+            onTap: widget.onTap,
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedBuilder(
+              animation: _pop,
+              builder: (context, child) {
+                // A single tween cannot express this: the brief's
+                // `.scale(begin: Offset(0.8, 0.8), end: Offset(1.1, 1.1))` has to
+                // land on 1.0, not 1.1, or the circle is left permanently 10%
+                // oversized. So squash in, overshoot to 1.12, then settle back to
+                // exactly 1.0. `elasticOut` on the second half is what makes it
+                // read as a bounce rather than a plain ease-out.
+                final scale = _popScale.value;
+                return Transform.scale(scale: scale, child: child);
+              },
+              child: AnimatedContainer(
+                duration: AppAnimationTokens.medium,
+                curve: Curves.easeOutCubic,
+                width: _diameter,
+                height: _diameter,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: widget.isCompleted
+                      ? LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            doneColor,
+                            Color.lerp(doneColor, AppColors.accentDeep, 0.3)!,
+                          ],
+                        )
+                      : null,
+                  color: widget.isCompleted
+                      ? null
+                      : accent.withValues(alpha: 0.08),
+                  border: Border.all(
+                    color: widget.isCompleted
+                        ? Colors.transparent
+                        : accent.withValues(alpha: 0.45),
+                    width: 2,
+                  ),
+                  boxShadow: widget.isCompleted
+                      ? [
+                          BoxShadow(
+                            color: doneColor.withValues(alpha: 0.45),
+                            blurRadius: 14,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: AnimatedSwitcher(
+                  duration: AppAnimationTokens.medium,
+                  switchInCurve: Curves.easeOutBack,
+                  // The tick cross-fades in but the surrounding circle is already
+                  // scaling, so fading the outgoing icon out over the same window
+                  // would make two ticks visible at once mid-pop.
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                      scale: animation,
+                      child: FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      )),
+                  child: widget.isCompleted
+                      ? Icon(
+                          LucideIcons.check,
+                          key: const ValueKey('done'),
+                          size: 24,
+                          color: ink,
+                        )
+                      : Icon(
+                          LucideIcons.plus,
+                          key: const ValueKey('todo'),
+                          size: 22,
+                          color: accent.withValues(alpha: 0.75),
+                        ),
+                ),
               ),
-              boxShadow: widget.isCompleted
-                  ? [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.45),
-                        blurRadius: 14,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: AnimatedSwitcher(
-              duration: AppAnimationTokens.medium,
-              switchInCurve: Curves.easeOutBack,
-              // The tick cross-fades in but the surrounding circle is already
-              // scaling, so fading the outgoing icon out over the same window
-              // would make two ticks visible at once mid-pop.
-              transitionBuilder: (child, animation) =>
-                  ScaleTransition(scale: animation, child: FadeTransition(
-                    opacity: animation,
-                    child: child,
-                  )),
-              child: widget.isCompleted
-                  ? Icon(
-                      Icons.check_rounded,
-                      key: const ValueKey('done'),
-                      size: 24,
-                      color: ink,
-                    )
-                  : Icon(
-                      Icons.add_rounded,
-                      key: const ValueKey('todo'),
-                      size: 22,
-                      color: accent.withValues(alpha: 0.75),
-                    ),
             ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }
 

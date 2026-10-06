@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/utils/app_clock.dart';
 import '../../data/repositories/analytics_repository_impl.dart';
 import '../../domain/analytics_data.dart';
 import '../../domain/analytics_repository.dart';
@@ -41,7 +42,7 @@ class AnalyticsController extends StateNotifier<AnalyticsState> {
     state =
         state.copyWith(isLoading: true, error: null, selectedPeriod: period);
 
-    final now = DateTime.now();
+    final now = AppClock.now();
     final result = await _repository.getAnalyticsData(
       startDate: _startDateFor(period, now),
       endDate: now,

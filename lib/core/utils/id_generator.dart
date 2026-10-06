@@ -10,4 +10,7 @@ class IdGenerator {
   static String generateCompletionId() => 'completion_${generateShort()}';
   static String generateSessionId() => 'session_${generateShort()}';
   static String generateEntryId() => 'entry_${generateShort()}';
+  static String generateGoalId() => 'goal_${generateShort()}';
+  static String generateProjectId() => 'project_${generateShort()}';
+  static String generateTaskId() => 'task_${generateShort()}';
 }

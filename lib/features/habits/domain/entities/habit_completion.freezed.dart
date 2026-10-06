@@ -17,7 +17,9 @@ final _privateConstructorUsedError = UnsupportedError(
 /// @nodoc
 mixin _$HabitCompletion {
   String get id => throw _privateConstructorUsedError;
-  String get habitId => throw _privateConstructorUsedError;
+  String? get habitId => throw _privateConstructorUsedError;
+  String? get itemId => throw _privateConstructorUsedError;
+  String? get itemType => throw _privateConstructorUsedError;
   DateTime get completedAt => throw _privateConstructorUsedError;
   int get count => throw _privateConstructorUsedError;
   Duration? get duration => throw _privateConstructorUsedError;
@@ -38,7 +40,9 @@ abstract class $HabitCompletionCopyWith<$Res> {
   @useResult
   $Res call(
       {String id,
-      String habitId,
+      String? habitId,
+      String? itemId,
+      String? itemType,
       DateTime completedAt,
       int count,
       Duration? duration,
@@ -61,7 +65,9 @@ class _$HabitCompletionCopyWithImpl<$Res, $Val extends HabitCompletion>
   @override
   $Res call({
     Object? id = null,
-    Object? habitId = null,
+    Object? habitId = freezed,
+    Object? itemId = freezed,
+    Object? itemType = freezed,
     Object? completedAt = null,
     Object? count = null,
     Object? duration = freezed,
@@ -74,10 +80,18 @@ class _$HabitCompletionCopyWithImpl<$Res, $Val extends HabitCompletion>
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
-      habitId: null == habitId
+      habitId: freezed == habitId
           ? _value.habitId
           : habitId // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
+      itemId: freezed == itemId
+          ? _value.itemId
+          : itemId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      itemType: freezed == itemType
+          ? _value.itemType
+          : itemType // ignore: cast_nullable_to_non_nullable
+              as String?,
       completedAt: null == completedAt
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
@@ -116,7 +130,9 @@ abstract class _$$HabitCompletionImplCopyWith<$Res>
   @useResult
   $Res call(
       {String id,
-      String habitId,
+      String? habitId,
+      String? itemId,
+      String? itemType,
       DateTime completedAt,
       int count,
       Duration? duration,
@@ -137,7 +153,9 @@ class __$$HabitCompletionImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? id = null,
-    Object? habitId = null,
+    Object? habitId = freezed,
+    Object? itemId = freezed,
+    Object? itemType = freezed,
     Object? completedAt = null,
     Object? count = null,
     Object? duration = freezed,
@@ -150,10 +168,18 @@ class __$$HabitCompletionImplCopyWithImpl<$Res>
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
-      habitId: null == habitId
+      habitId: freezed == habitId
           ? _value.habitId
           : habitId // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
+      itemId: freezed == itemId
+          ? _value.itemId
+          : itemId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      itemType: freezed == itemType
+          ? _value.itemType
+          : itemType // ignore: cast_nullable_to_non_nullable
+              as String?,
       completedAt: null == completedAt
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
@@ -187,7 +213,9 @@ class __$$HabitCompletionImplCopyWithImpl<$Res>
 class _$HabitCompletionImpl extends _HabitCompletion {
   const _$HabitCompletionImpl(
       {required this.id,
-      required this.habitId,
+      this.habitId,
+      this.itemId,
+      this.itemType,
       required this.completedAt,
       required this.count,
       this.duration,
@@ -199,7 +227,11 @@ class _$HabitCompletionImpl extends _HabitCompletion {
   @override
   final String id;
   @override
-  final String habitId;
+  final String? habitId;
+  @override
+  final String? itemId;
+  @override
+  final String? itemType;
   @override
   final DateTime completedAt;
   @override
@@ -215,7 +247,7 @@ class _$HabitCompletionImpl extends _HabitCompletion {
 
   @override
   String toString() {
-    return 'HabitCompletion(id: $id, habitId: $habitId, completedAt: $completedAt, count: $count, duration: $duration, note: $note, moodRating: $moodRating, energyRating: $energyRating)';
+    return 'HabitCompletion(id: $id, habitId: $habitId, itemId: $itemId, itemType: $itemType, completedAt: $completedAt, count: $count, duration: $duration, note: $note, moodRating: $moodRating, energyRating: $energyRating)';
   }
 
   @override
@@ -225,6 +257,9 @@ class _$HabitCompletionImpl extends _HabitCompletion {
             other is _$HabitCompletionImpl &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.habitId, habitId) || other.habitId == habitId) &&
+            (identical(other.itemId, itemId) || other.itemId == itemId) &&
+            (identical(other.itemType, itemType) ||
+                other.itemType == itemType) &&
             (identical(other.completedAt, completedAt) ||
                 other.completedAt == completedAt) &&
             (identical(other.count, count) || other.count == count) &&
@@ -238,8 +273,8 @@ class _$HabitCompletionImpl extends _HabitCompletion {
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, id, habitId, completedAt, count,
-      duration, note, moodRating, energyRating);
+  int get hashCode => Object.hash(runtimeType, id, habitId, itemId, itemType,
+      completedAt, count, duration, note, moodRating, energyRating);
 
   @JsonKey(ignore: true)
   @override
@@ -252,7 +287,9 @@ class _$HabitCompletionImpl extends _HabitCompletion {
 abstract class _HabitCompletion extends HabitCompletion {
   const factory _HabitCompletion(
       {required final String id,
-      required final String habitId,
+      final String? habitId,
+      final String? itemId,
+      final String? itemType,
       required final DateTime completedAt,
       required final int count,
       final Duration? duration,
@@ -264,7 +301,11 @@ abstract class _HabitCompletion extends HabitCompletion {
   @override
   String get id;
   @override
-  String get habitId;
+  String? get habitId;
+  @override
+  String? get itemId;
+  @override
+  String? get itemType;
   @override
   DateTime get completedAt;
   @override

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ascend/app/app.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 void main() {
   testWidgets('Ascend app shows its loading screen while the database opens', (
@@ -14,7 +15,7 @@ void main() {
     // to wait for. Assert on the first frame instead of using `pumpAndSettle`.
     expect(find.text('Ascend'), findsOneWidget);
     expect(find.text('Initializing your data…'), findsOneWidget);
-    expect(find.byIcon(Icons.trending_up_rounded), findsOneWidget);
+    expect(find.byIcon(LucideIcons.trendingUp), findsOneWidget);
 
     // Unmount before the test ends: a repeating animation holds a running
     // ticker, and `flutter_test` fails on anything still pending when the test

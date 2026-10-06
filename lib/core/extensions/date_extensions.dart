@@ -1,5 +1,7 @@
 import 'package:intl/intl.dart';
 
+import '../utils/app_clock.dart';
+
 /// Shared date/time helpers used across every feature.
 extension DateTimeExtensions on DateTime {
   DateTime get startOfDay => DateTime(year, month, day);
@@ -14,14 +16,14 @@ extension DateTimeExtensions on DateTime {
   DateTime get startOfMonth => DateTime(year, month, 1);
   DateTime get endOfMonth => DateTime(year, month + 1, 0, 23, 59, 59, 999);
 
-  bool get isToday => startOfDay == DateTime.now().startOfDay;
+  bool get isToday => startOfDay == AppClock.now().startOfDay;
   bool get isYesterday =>
-      startOfDay == DateTime.now().startOfDay.subtract(const Duration(days: 1));
+      startOfDay == AppClock.now().startOfDay.subtract(const Duration(days: 1));
   bool get isTomorrow =>
-      startOfDay == DateTime.now().startOfDay.add(const Duration(days: 1));
-  bool get isThisWeek => startOfWeek == DateTime.now().startOfWeek;
+      startOfDay == AppClock.now().startOfDay.add(const Duration(days: 1));
+  bool get isThisWeek => startOfWeek == AppClock.now().startOfWeek;
   bool get isThisMonth =>
-      year == DateTime.now().year && month == DateTime.now().month;
+      year == AppClock.now().year && month == AppClock.now().month;
 
   String format({String pattern = 'MMM d, yyyy'}) =>
       DateFormat(pattern).format(this);
@@ -29,7 +31,7 @@ extension DateTimeExtensions on DateTime {
       DateFormat(pattern).format(this);
 
   String formatRelative() {
-    final now = DateTime.now();
+    final now = AppClock.now();
     final difference = now.difference(this);
 
     // A timestamp in the future produces a negative duration, which used to

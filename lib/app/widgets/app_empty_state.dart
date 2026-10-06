@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/text_styles.dart';
 import 'glow_button.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Shared "there is nothing here yet" panel.
 ///
@@ -55,7 +56,7 @@ class AppEmptyState extends StatelessWidget {
                   Positioned.fill(
                     child: AuroraBackdrop(
                       accentA: tint,
-                      accentB: AppColors.radiantViolet,
+                      accentB: AppColors.accentDeep,
                       opacity: 0.22,
                     ),
                   ),
@@ -100,7 +101,7 @@ class AppEmptyState extends StatelessWidget {
               GlowButton(
                 label: actionLabel!,
                 accent: tint,
-                icon: Icons.add_rounded,
+                icon: LucideIcons.plus,
                 onPressed: onAction,
                 height: 50,
               ),

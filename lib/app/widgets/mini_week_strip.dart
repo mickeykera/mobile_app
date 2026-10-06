@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/utils/app_clock.dart';
 import '../theme/app_theme.dart';
 import 'week_strip.dart';
 
@@ -18,7 +19,7 @@ List<WeekDayState> deriveWeekStates({
 }) {
   // `reference` is the day the user is looking at, which is "today" for the
   // live screen but an arbitrary past date in tests and date navigation.
-  final today = reference ?? DateTime.now();
+  final today = reference ?? AppClock.now();
   final todayDate = DateTime(today.year, today.month, today.day);
   // Monday-first index of the current week.
   final monday = todayDate.subtract(Duration(days: todayDate.weekday - 1));

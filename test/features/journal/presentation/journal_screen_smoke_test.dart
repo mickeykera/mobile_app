@@ -17,7 +17,8 @@ import 'journal_controller_test.dart' show FakeJournalRepository;
 JournalEntry _todayMorning({Map<String, String>? responses}) {
   return JournalEntry.createMorning(
     date: DateTime.now(),
-    responses: responses ?? {AppConstants.morningPrompts.first: 'Ship the redesign'},
+    responses:
+        responses ?? {AppConstants.morningPrompts.first: 'Ship the redesign'},
   );
 }
 

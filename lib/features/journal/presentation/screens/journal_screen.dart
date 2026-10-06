@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../controllers/journal_controller.dart';
 import '../../domain/entities/journal_entry.dart';
 import '../../../../core/utils/date_utils.dart';
@@ -14,6 +15,7 @@ import '../../../../app/widgets/glass_card.dart';
 import '../../../../app/widgets/glow_button.dart';
 import '../../../../app/widgets/pill_chip.dart';
 import '../../../../app/widgets/pressable.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class JournalScreen extends ConsumerStatefulWidget {
   const JournalScreen({super.key});
@@ -40,8 +42,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     return Scaffold(
       floatingActionButton: GlowButton(
         label: 'New Entry',
-        icon: Icons.edit_rounded,
-        accent: AppColors.radiantViolet,
+        icon: LucideIcons.pencil,
+        accent: AppColors.accentDeep,
         height: 52,
         onPressed: () => _showEntrySheet(context),
       ),
@@ -125,7 +127,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                       Expanded(
                         child: ShaderMask(
                           shaderCallback:
-                              AppGradients.action(AppColors.radiantViolet)
+                              AppGradients.action(AppColors.accentDeep)
                                   .createShader,
                           child: Text(
                             'Reflection',
@@ -167,11 +169,11 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
   Widget _buildDateSelector(BuildContext context, JournalState state) {
     final colorScheme = Theme.of(context).colorScheme;
-    final date = state.selectedDate ?? DateTime.now();
+    final date = state.selectedDate ?? AppClock.now();
 
     return GlassPill(
       label: date.formatRelative(),
-      icon: Icons.calendar_today_outlined,
+      icon: LucideIcons.calendar,
       selected: true,
       accent: colorScheme.primary,
       onTap: () => _pickDate(context),
@@ -191,15 +193,11 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                 GlassPill(
                   label: types[i],
                   selected: _selected == i,
-                  icon: i == 0
-                      ? Icons.wb_sunny_outlined
-                      : Icons.nights_stay_outlined,
+                  icon: i == 0 ? LucideIcons.sun : LucideIcons.moon,
                   // Morning leans warm, Evening leans violet: the pill colour
                   // tells you which half of the day you are in before you read
                   // the label.
-                  accent: i == 0
-                      ? AppColors.coralOrange
-                      : AppColors.radiantViolet,
+                  accent: i == 0 ? AppColors.accentWarm : AppColors.accentDeep,
                   onTap: () => _selectType(i),
                 ),
             ],
@@ -227,14 +225,15 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
         _RatingIndicator(
           label: 'Mood',
           rating: entry!.moodRating!,
-          icon: Icons.sentiment_satisfied_outlined,
+          icon: LucideIcons.smile,
         ),
       if (entry?.energyRating != null) ...[
-        if (entry?.moodRating != null) const SizedBox(width: AppSpacingTokens.sm),
+        if (entry?.moodRating != null)
+          const SizedBox(width: AppSpacingTokens.sm),
         _RatingIndicator(
           label: 'Energy',
           rating: entry!.energyRating!,
-          icon: Icons.battery_charging_full_rounded,
+          icon: LucideIcons.batteryCharging,
         ),
       ],
     ];
@@ -271,15 +270,37 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
         context,
         _selected == 0 ? 'Morning Intention' : 'Evening Debrief',
         _selected == 0 ? 'Start your day with clarity' : 'Reflect on your day',
-        _selected == 0
-            ? Icons.wb_sunny_outlined
-            : Icons.nights_stay_outlined,
-        _selected == 0 ? AppColors.coralOrange : AppColors.radiantViolet,
+        _selected == 0 ? LucideIcons.sun : LucideIcons.moon,
+        _selected == 0 ? AppColors.accentWarm : AppColors.accentDeep,
       );
     }
 
-    return Column(
+    final cs = Theme.of(context).colorScheme;
+        return Column(
       children: [
+        // Delete button for existing entries
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacingTokens.sm),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Pressable(
+              onTap: () => _confirmDeleteEntry(context, entry),
+              haptics: true,
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacingTokens.sm),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer,
+                  borderRadius: BorderRadius.circular(AppRadiusTokens.full),
+                ),
+                child: Icon(
+                  LucideIcons.trash2,
+                  size: 18,
+                  color: cs.onErrorContainer,
+                ),
+              ),
+            ),
+          ),
+        ),
         _JournalPromptCard(
           // A stable key per slot: without it, Flutter reuses the state of the
           // previous card when the list changes length, so a typed response
@@ -288,8 +309,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
           // a changing key would tear down the field being typed into.
           key: ValueKey('mood-$_selected-${entry.id}'),
           prompt: 'How are you feeling?',
-          icon: Icons.favorite_outline_rounded,
-          accent: AppColors.radiantViolet,
+          icon: LucideIcons.heart,
+          accent: AppColors.accentDeep,
           readOnlyText: entry.moodRating == null && entry.energyRating == null
               ? null
               : 'Mood ${entry.moodRating ?? '–'}/5   ·   '
@@ -299,7 +320,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
               Expanded(
                 child: _RatingScale(
                   label: 'Mood',
-                  icon: Icons.sentiment_satisfied_outlined,
+                  icon: LucideIcons.smile,
                   rating: entry.moodRating,
                   onChanged: _updateMood,
                 ),
@@ -308,7 +329,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
               Expanded(
                 child: _RatingScale(
                   label: 'Energy',
-                  icon: Icons.battery_charging_full_rounded,
+                  icon: LucideIcons.batteryCharging,
                   rating: entry.energyRating,
                   onChanged: _updateEnergy,
                 ),
@@ -342,8 +363,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
           child: _JournalPromptCard(
             key: ValueKey('gratitude-$_selected-${entry.id}'),
             prompt: 'Gratitude',
-            icon: Icons.favorite_outline_rounded,
-            accent: AppColors.coralOrange,
+            icon: LucideIcons.heart,
+            accent: AppColors.accentWarm,
             initialText: entry.gratitudeNote ?? '',
             hintText: 'What are you grateful for?',
             maxLength: 500,
@@ -361,19 +382,54 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     );
   }
 
+  Future<void> _confirmDeleteEntry(
+      BuildContext context, JournalEntry entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Entry'),
+        content: Text(
+            'Are you sure you want to delete this ${_selected == 0 ? 'Morning' : 'Evening'} entry? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final result = await ref
+          .read(journalControllerProvider.notifier)
+          .deleteCurrentEntry();
+      if (result.isLeft && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.left?.userMessage ?? 'Could not delete')),
+        );
+      }
+    }
+  }
+
   IconData _promptIcon(String prompt) {
     final lower = prompt.toLowerCase();
-    if (lower.contains('gratitude')) return Icons.volunteer_activism_outlined;
+    if (lower.contains('gratitude')) return LucideIcons.heartHandshake;
     if (lower.contains('went well') || lower.contains('win')) {
-      return Icons.trending_up_rounded;
+      return LucideIcons.trendingUp;
     }
     if (lower.contains('learn') || lower.contains('lesson')) {
-      return Icons.lightbulb_outline_rounded;
+      return LucideIcons.lightbulb;
     }
     if (lower.contains('tomorrow') || lower.contains('next')) {
-      return Icons.arrow_forward_rounded;
+      return LucideIcons.arrowRight;
     }
-    return Icons.edit_note_rounded;
+    return LucideIcons.notebookPen;
   }
 
   /// Prompt cards are tinted, not all the same colour. A wall of identical grey
@@ -381,10 +437,10 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
   /// prompt an accent gives the eye somewhere to rest.
   Color _accentForPrompt(String prompt) {
     const accents = [
-      AppColors.neonCyan,
-      AppColors.radiantViolet,
-      AppColors.coralOrange,
-      AppColors.emerald,
+      AppColors.accentPrimary,
+      AppColors.accentDeep,
+      AppColors.accentWarm,
+      AppColors.accentLive,
     ];
     return accents[prompt.hashCode.abs() % accents.length];
   }
@@ -411,7 +467,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                   Positioned.fill(
                     child: AuroraBackdrop(
                       accentA: color,
-                      accentB: AppColors.radiantViolet,
+                      accentB: AppColors.accentDeep,
                       opacity: 0.2,
                     ),
                   ),
@@ -521,19 +577,19 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
       builder: (context) => _EntrySheet(
         initialType: ref.read(journalControllerProvider).selectedType,
         initialDate:
-            ref.read(journalControllerProvider).selectedDate ?? DateTime.now(),
+            ref.read(journalControllerProvider).selectedDate ?? AppClock.now(),
       ),
     );
   }
 
   Future<void> _pickDate(BuildContext context) async {
     final currentDate =
-        ref.read(journalControllerProvider).selectedDate ?? DateTime.now();
+        ref.read(journalControllerProvider).selectedDate ?? AppClock.now();
     final date = await showDatePicker(
       context: context,
       initialDate: currentDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: AppClock.now(),
     );
     if (date != null && mounted) {
       ref.read(journalControllerProvider.notifier).setSelectedDate(date);
@@ -1005,7 +1061,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                           ),
                         ),
                         GlowIconButton(
-                          icon: Icons.close_rounded,
+                          icon: LucideIcons.x,
                           accent: theme.colorScheme.onSurfaceVariant,
                           size: 40,
                           onPressed: () => Navigator.pop(context),
@@ -1026,8 +1082,8 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                     const SizedBox(height: AppSpacingTokens.lg),
                     GlowButton(
                       label: 'Save Entry',
-                      icon: Icons.check_rounded,
-                      accent: AppColors.radiantViolet,
+                      icon: LucideIcons.check,
+                      accent: AppColors.accentDeep,
                       width: double.infinity,
                       onPressed: _saveEntry,
                     ),
@@ -1053,11 +1109,8 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
             child: GlassPill(
               label: types[i],
               selected: _type == types[i],
-              icon: i == 0
-                  ? Icons.wb_sunny_outlined
-                  : Icons.nights_stay_outlined,
-              accent:
-                  i == 0 ? AppColors.coralOrange : AppColors.radiantViolet,
+              icon: i == 0 ? LucideIcons.sun : LucideIcons.moon,
+              accent: i == 0 ? AppColors.accentWarm : AppColors.accentDeep,
               onTap: () => _selectType(types[i]),
             ),
           ),
@@ -1094,7 +1147,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
 
     return GlassPill(
       label: _date.formatRelative(),
-      icon: Icons.calendar_today_outlined,
+      icon: LucideIcons.calendar,
       selected: true,
       accent: theme.colorScheme.primary,
       onTap: _pickDate,
@@ -1107,7 +1160,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
         Expanded(
           child: _RatingScale(
             label: 'Mood',
-            icon: Icons.sentiment_satisfied_outlined,
+            icon: LucideIcons.smile,
             rating: _moodRating,
             onChanged: (r) => setState(() => _moodRating = r),
           ),
@@ -1116,7 +1169,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
         Expanded(
           child: _RatingScale(
             label: 'Energy',
-            icon: Icons.battery_charging_full_rounded,
+            icon: LucideIcons.batteryCharging,
             rating: _energyRating,
             onChanged: (r) => setState(() => _energyRating = r),
           ),
@@ -1149,13 +1202,13 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
               controller: _controllers[prompt],
               maxLines: 3,
               minLines: 3,
-                  maxLength: 1000,
-                  cursorColor: AppColors.radiantViolet,
-                  style: AppTextStyles.bodyLarge.copyWith(height: 1.5),
-                  decoration: const InputDecoration(
-                    hintText: 'Your reflection…',
-                    counterText: '',
-                    border: InputBorder.none,
+              maxLength: 1000,
+              cursorColor: AppColors.accentDeep,
+              style: AppTextStyles.bodyLarge.copyWith(height: 1.5),
+              decoration: const InputDecoration(
+                hintText: 'Your reflection…',
+                counterText: '',
+                border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
@@ -1177,9 +1230,9 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
         const Row(
           children: [
             Icon(
-              Icons.favorite_outline_rounded,
+              LucideIcons.heart,
               size: 16,
-              color: AppColors.coralOrange,
+              color: AppColors.accentWarm,
             ),
             SizedBox(width: 6),
             Text('Gratitude', style: AppTextStyles.labelLarge),
@@ -1196,10 +1249,11 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
             vertical: AppSpacingTokens.sm + 4,
           ),
           child: TextField(
-            controller: _gratitudeController,            maxLines: 3,
+            controller: _gratitudeController,
+            maxLines: 3,
             minLines: 3,
             maxLength: 500,
-            cursorColor: AppColors.coralOrange,
+            cursorColor: AppColors.accentWarm,
             style: AppTextStyles.bodyLarge.copyWith(height: 1.5),
             decoration: const InputDecoration(
               hintText: 'What are you grateful for?',
@@ -1232,7 +1286,8 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                   color: AppColors.insetFill(theme.colorScheme, opacity: 0.55),
                   borderRadius: BorderRadius.circular(AppRadiusTokens.input),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacingTokens.md),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpacingTokens.md),
                 child: TextField(
                   controller: _tagController,
                   textInputAction: TextInputAction.done,
@@ -1251,7 +1306,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
             ),
             const SizedBox(width: AppSpacingTokens.sm),
             GlowIconButton(
-              icon: Icons.add_rounded,
+              icon: LucideIcons.plus,
               accent: theme.colorScheme.primary,
               size: 48,
               tooltip: 'Add tag',
@@ -1269,8 +1324,8 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                 GlassPill(
                   label: tag,
                   selected: true,
-                  accent: AppColors.emerald,
-                  icon: Icons.close_rounded,
+                  accent: AppColors.accentLive,
+                  icon: LucideIcons.x,
                   onTap: () => setState(() => _tags.remove(tag)),
                 ),
             ],
@@ -1295,7 +1350,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
       context: context,
       initialDate: _date,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: AppClock.now(),
     );
     if (date != null && mounted) {
       setState(() => _date = date);

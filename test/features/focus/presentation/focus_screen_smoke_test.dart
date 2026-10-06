@@ -78,7 +78,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the breathing ring scales and halts when paused', (tester) async {
+  testWidgets('the breathing ring scales and halts when paused',
+      (tester) async {
     await _pump(tester);
 
     await tester.ensureVisible(find.text('Start Session'));

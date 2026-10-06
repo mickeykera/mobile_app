@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../../domain/entities/focus_session.dart';
 import '../../domain/repositories/focus_repository.dart';
+import '../../../progress/domain/services/progress_service.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/database/database.dart';
 import '../../../../core/extensions/date_extensions.dart';
@@ -9,15 +11,26 @@ import '../../../../core/extensions/date_extensions.dart';
 class FocusRepositoryImpl implements FocusRepository {
   final DatabaseService _database;
   final List<FocusSession> _sessions = [];
-  bool _loaded = false;
 
-  FocusRepositoryImpl(this._database);
+  /// Shared with the other repositories so the category buckets have one
+  /// definition; it is a pure calculator, so a default instance is enough.
+  final ProgressService _progress;
 
-  Future<void> _ensureLoaded() async {
-    if (_loaded) return;
-    await _loadFromPrefs();
-    _loaded = true;
-  }
+  /// Memoised load, not a `bool` guard.
+  ///
+  /// `if (_loaded) return; await _loadFromPrefs(); _loaded = true;` loses the
+  /// race: two callers both read `_loaded == false` before either finishes the
+  /// `await`, so both run the load and both append to the cache. That doubles
+  /// every row - one stored habit came back as two with the same id.
+  ///
+  /// Holding the `Future` makes the guard idempotent, because `??=` resolves
+  /// the first caller's future for everyone who arrives while it is in flight.
+  Future<void>? _loading;
+
+  FocusRepositoryImpl(this._database, [ProgressService? progress])
+      : _progress = progress ?? const ProgressService();
+
+  Future<void> _ensureLoaded() => _loading ??= _loadFromPrefs();
 
   Future<void> _loadFromPrefs() async {
     final sessionsJson = _database.getJsonList('focus_sessions') ?? [];
@@ -57,6 +70,9 @@ class FocusRepositoryImpl implements FocusRepository {
           : null,
       habitId: json['habitId'] as String?,
       projectName: json['projectName'] as String?,
+      taskId: json['taskId'] as String?,
+      projectId: json['projectId'] as String?,
+      outcome: json['outcome'] as String?,
       focusRating: json['focusRating'] as int?,
       reflectionNotes: json['reflectionNotes'] as String?,
       isActive: json['isActive'] as bool,
@@ -83,6 +99,9 @@ class FocusRepositoryImpl implements FocusRepository {
       'accumulatedBreakTime': session.accumulatedBreakTime?.inMilliseconds,
       'habitId': session.habitId,
       'projectName': session.projectName,
+      'taskId': session.taskId,
+      'projectId': session.projectId,
+      'outcome': session.outcome,
       'focusRating': session.focusRating,
       'reflectionNotes': session.reflectionNotes,
       'isActive': session.isActive,
@@ -206,7 +225,7 @@ class FocusRepositoryImpl implements FocusRepository {
   Future<Result<Map<DateTime, int>>> getFocusHeatmap({int weeks = 12}) async {
     await _ensureLoaded();
     try {
-      final endDate = DateTime.now();
+      final endDate = AppClock.now();
       final startDate = endDate.subtract(Duration(days: weeks * 7));
 
       final sessions = _sessions
@@ -245,12 +264,7 @@ class FocusRepositoryImpl implements FocusRepository {
         return true;
       }).toList();
 
-      final byCategory = <String, int>{};
-      for (final session in sessions) {
-        final category = session.projectName ?? 'Uncategorized';
-        byCategory[category] =
-            (byCategory[category] ?? 0) + session.totalWorkMinutes;
-      }
+      final byCategory = _progress.focusBreakdown(sessions).byCategory;
       return Either.right(byCategory);
     } catch (e, st) {
       return Either.left(CacheFailure('Failed to get focus by category: $e',
@@ -261,5 +275,5 @@ class FocusRepositoryImpl implements FocusRepository {
 
 final focusRepositoryProvider = Provider<FocusRepository>((ref) {
   final database = ref.watch(databaseServiceProvider);
-  return FocusRepositoryImpl(database);
+  return FocusRepositoryImpl(database, ref.watch(progressServiceProvider));
 });

@@ -29,6 +29,8 @@ class GlowButton extends StatefulWidget {
 
   /// Continuously pulse the glow. Reserved for a single screen's single
   /// conversion action; more than one pulsing element on screen defeats it.
+  static bool debugDisablePulsing = false;
+
   final bool pulsing;
 
   /// A brighter gradient with dark foreground text, for use on top of an
@@ -64,13 +66,17 @@ class _GlowButtonState extends State<GlowButton>
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     );
-    if (widget.pulsing) _pulse.repeat(reverse: true);
+    if (widget.pulsing && !GlowButton.debugDisablePulsing) {
+      _pulse.repeat(reverse: true);
+    }
   }
 
   @override
   void didUpdateWidget(GlowButton oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.pulsing && !_pulse.isAnimating) {
+    if (widget.pulsing &&
+        !GlowButton.debugDisablePulsing &&
+        !_pulse.isAnimating) {
       _pulse.repeat(reverse: true);
     } else if (!widget.pulsing && _pulse.isAnimating) {
       _pulse.stop();
@@ -200,8 +206,8 @@ class AuroraBackdrop extends StatelessWidget {
 
   const AuroraBackdrop({
     super.key,
-    this.accentA = AppColors.neonCyan,
-    this.accentB = AppColors.radiantViolet,
+    this.accentA = AppColors.accentPrimary,
+    this.accentB = AppColors.accentDeep,
     this.opacity = 0.16,
   });
 

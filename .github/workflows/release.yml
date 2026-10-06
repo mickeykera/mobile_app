@@ -1,0 +1,280 @@
+name: Release
+
+# Creates a GitHub Release with APK, AAB, and unsigned IPA
+# when a version tag (vX.Y.Z) is pushed.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # required to create a release
+
+jobs:
+  android:
+    name: Android (APK + AAB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Restore signing key if provided
+      - name: Restore signing key (optional)
+        if: env.KEYSTORE_BASE64 != ''
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$RUNNER_TEMP/release.jks
+          EOF
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Build release AAB
+        run: flutter build appbundle --release
+
+      # Verify APK is signed with the release key (if keystore provided)
+      - name: Verify APK is signed with the release key
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner not found - cannot verify signing"
+            exit 1
+          fi
+          SIG=$("$APKSIGNER" verify --print-certs \
+            build/app/outputs/flutter-apk/app-release.apk | grep -m1 'certificate DN')
+          if [ -z "$SIG" ]; then
+            echo "::error::could not read a signer from the APK"
+            exit 1
+          fi
+          echo "signer: $SIG"
+          if echo "$SIG" | grep -q 'Android Debug'; then
+            echo "::error::APK is signed with the debug key - not publishable"
+            exit 1
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ascend-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 90
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ascend-AAB
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 90
+
+  ios:
+    name: iOS (unsigned build)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test
+
+      - name: Build iOS app (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Verify the bundle was actually produced
+        run: |
+          APP=build/ios/iphoneos/Runner.app
+          if [ ! -d "$APP" ]; then
+            echo "::error::Runner.app was not produced"
+            find build/ios -maxdepth 2 -type d || true
+            exit 1
+          fi
+          echo "bundle: $APP"
+          du -sh "$APP"
+          if codesign -dv "$APP" 2>&1 | grep -q 'signature'; then
+            echo "note: bundle carries a signature"
+          else
+            echo "note: bundle is UNSIGNED - not installable on a device"
+          fi
+
+      - name: Package as IPA
+        run: |
+          set -e
+          rm -rf build/ios/ipa_unsigned
+          mkdir -p build/ios/ipa_unsigned/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/ipa_unsigned/Payload/
+          cd build/ios/ipa_unsigned
+          zip -qry ../Ascend-unsigned.ipa Payload
+          cd - > /dev/null
+          ls -la build/ios/Ascend-unsigned.ipa
+
+      - name: Verify the IPA structure
+        run: |
+          IPA=build/ios/Ascend-unsigned.ipa
+          if [ ! -f "$IPA" ]; then
+            echo "::error::ipa was not produced"
+            exit 1
+          fi
+          if ! unzip -l "$IPA" | grep -q 'Payload/Runner.app/Info.plist'; then
+            echo "::error::ipa is missing Payload/Runner.app/Info.plist"
+            unzip -l "$IPA" | head -20
+            exit 1
+          fi
+          echo "ipa structure OK:"
+          unzip -l "$IPA" | grep -E 'Payload/Runner.app/(Info.plist|Runner)$'
+          echo "entries: $(unzip -l "$IPA" | tail -1 | awk '{print $2}')"
+
+      - name: Upload unsigned IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ascend-iOS-Unsigned
+          path: build/ios/Ascend-unsigned.ipa
+          retention-days: 90
+
+      # The signed path only runs once an Apple developer account, a
+      # distribution certificate and a provisioning profile exist.
+      - name: Decode iOS signing assets
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+        env:
+          IOS_CERT_P12_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
+          IOS_CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+          IOS_PROVISION_PROFILE: ${{ secrets.IOS_PROVISION_PROFILE }}
+        run: |
+          echo "$IOS_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          echo "$IOS_PROVISION_PROFILE" > "$RUNNER_TEMP/Runner.mobileprovision"
+          security create-keychain -p ci-keychain
+          security default-keychain -s ci-keychain
+          security unlock-keychain -p ci-keychain
+          security import "$RUNNER_TEMP/cert.p12" -k ci-keychain \
+            -P "$IOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k ci-keychain -p ci-keychain > /dev/null
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/Runner.mobileprovision" \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/"
+
+      - name: Build signed IPA
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+        run: flutter build ipa --release
+
+      - name: Upload signed IPA artifact
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ascend-iOS-Signed
+          path: build/ios/ipa/*.ipa
+          retention-days: 90
+
+      - name: Clean up keychain
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+        run: security delete-keychain ci-keychain || true
+
+  release:
+    name: Create GitHub Release
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: Ascend-APK
+          path: ./artifacts
+
+      - name: Download Android AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: Ascend-AAB
+          path: ./artifacts
+
+      - name: Download unsigned iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: Ascend-iOS-Unsigned
+          path: ./artifacts
+
+      - name: Download signed iOS IPA (optional)
+        uses: actions/download-artifact@v4
+        if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+        with:
+          name: Ascend-iOS-Signed
+          path: ./artifacts
+
+      - name: List artifacts
+        run: |
+          ls -la ./artifacts/
+          echo "Files to attach:"
+          for f in ./artifacts/*; do
+            echo "  - $f"
+          done
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Ascend ${{ steps.version.outputs.version }}
+          body: |
+            ## Ascend ${{ steps.version.outputs.version }}
+
+            ### Android
+            - **APK**: `Ascend-APK` — `app-release.apk`
+            - **AAB**: `Ascend-AAB` — `app-release.aab` (for Google Play)
+
+            ### iOS
+            - **Unsigned IPA**: `Ascend-iOS-Unsigned` — `Ascend-unsigned.ipa`
+              (unsigned, not installable on devices without re-signing)
+            ${{ vars.IOS_SIGNING_ENABLED == 'true' && format('- **Signed IPA**: `Ascend-iOS-Signed` — distributable IPA (requires Apple Developer account)') || '' }}
+
+            ### Installation
+            - **Android**: Install the APK via `adb install app-release.apk` or sideload.
+            - **iOS**: The unsigned IPA cannot be installed directly. It requires re-signing with a valid Apple Developer certificate or use with Xcode.
+          files: |
+            ./artifacts/app-release.apk
+            ./artifacts/app-release.aab
+            ./artifacts/Ascend-unsigned.ipa
+            ${{ vars.IOS_SIGNING_ENABLED == 'true' && format('./artifacts/*.ipa') || '' }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

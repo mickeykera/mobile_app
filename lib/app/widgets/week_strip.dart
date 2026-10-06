@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/text_styles.dart';
 import 'progress_ring.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// How a single day in a [WeekStrip] should be drawn.
 enum WeekDayState {
@@ -183,7 +184,7 @@ class _DayCell extends StatelessWidget {
                   strokeWidth: 3,
                   child: state == WeekDayState.complete
                       ? Icon(
-                          Icons.check_rounded,
+                          LucideIcons.check,
                           size: (size - 6) * 0.52,
                           color: AppColors.onColorFor(ringColor, scheme),
                         )

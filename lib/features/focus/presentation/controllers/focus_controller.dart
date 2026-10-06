@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../core/utils/app_clock.dart';
 import '../../domain/entities/focus_session.dart';
 import '../../data/repositories/focus_repository_impl.dart';
 import '../../domain/repositories/focus_repository.dart';
@@ -224,13 +225,13 @@ class FocusController extends StateNotifier<FocusState> {
     final session = state.activeSession;
     if (session == null || session.isPaused || !session.isActive) return;
 
-    final now = DateTime.now();
+    final now = AppClock.now();
     if (_lastTick != null && now.difference(_lastTick!).inSeconds < 1) return;
     _lastTick = now;
 
     // The session exposes live getters (`elapsedWorkTime`,
     // `formattedElapsed`, `currentPhaseProgress`) computed from
-    // `DateTime.now()`, so nothing inside it changes on a tick and assigning
+    // `AppClock.now()`, so nothing inside it changes on a tick and assigning
     // the same state is a no-op: Riverpod drops the notification when the new
     // state equals the old one. `tickCount` gives every tick a distinct state
     // so the timer and the derived progress providers actually update.

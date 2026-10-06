@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app/theme/app_colors.dart';
 import '../../../../core/extensions/date_extensions.dart';
+import '../../../../core/utils/app_clock.dart';
 
 /// First day drawn in a [weeks]-wide heatmap grid.
 ///
@@ -52,7 +54,7 @@ class HeatmapWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final now = DateTime.now();
+    final now = AppClock.now();
     final today = now.startOfDay;
     // Anchor the grid on the *current* week and walk backwards, instead of
     // walking back `weeks * 7` days first and then snapping to a week start.
@@ -218,7 +220,18 @@ class HeatmapWidget extends ConsumerWidget {
                       child: Text(
                         value.toString(),
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: intensity > 0.5 ? Colors.white : color,
+                          // Scored against the actual tile fill, not a guess.
+                          // A hardcoded white scored 3.7:1 on electric blue,
+                          // which is under the 4.5:1 floor for the 8px numerals
+                          // this is actually rendering.
+                          color: intensity > 0.5
+                              ? AppColors.onColorFor(
+                                  color.withValues(
+                                    alpha: 0.15 + intensity * 0.85,
+                                  ),
+                                  theme.colorScheme,
+                                )
+                              : color,
                           fontWeight: FontWeight.w600,
                           fontSize: 8,
                         ),
@@ -248,7 +261,7 @@ class MiniHeatmapWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final now = DateTime.now();
+    final now = AppClock.now();
     // Same anchoring as [HeatmapWidget]: the last column is the current week,
     // so the most recent day is actually drawn.
     final startDate = heatmapStartDate(now, weeks);

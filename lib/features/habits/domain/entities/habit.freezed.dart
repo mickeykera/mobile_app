@@ -32,6 +32,29 @@ mixin _$Habit {
   bool get isArchived => throw _privateConstructorUsedError;
   int get streakFreezesUsed => throw _privateConstructorUsedError;
   DateTime? get lastCompletedAt => throw _privateConstructorUsedError;
+
+  /// The moment this habit should next become due, set by a reschedule.
+  DateTime? get dueAt => throw _privateConstructorUsedError;
+
+  /// While this is in the future the habit is held out of the workload, set
+  /// by a snooze.
+  DateTime? get snoozedUntil => throw _privateConstructorUsedError;
+
+  /// The project this habit is filed under, if any.
+  ///
+  /// Optional and id-only: the project is looked up by [projectId] rather
+  /// than embedded, so the habit and project stay independently movable.
+  String? get projectId => throw _privateConstructorUsedError;
+
+  /// The goal this habit is filed under, if any.
+  String? get goalId => throw _privateConstructorUsedError;
+
+  /// The Task this habit has been migrated to, if any.
+  ///
+  /// When non-null, this Habit is the legacy representation of the Task.
+  /// The Task is the canonical recurring item; this Habit is retained for
+  /// rollback and audit but is excluded from user-facing recurring-work lists.
+  String? get taskId => throw _privateConstructorUsedError;
   int get currentStreak => throw _privateConstructorUsedError;
   int get longestStreak => throw _privateConstructorUsedError;
   int get totalCompletions => throw _privateConstructorUsedError;
@@ -62,6 +85,11 @@ abstract class $HabitCopyWith<$Res> {
       bool isArchived,
       int streakFreezesUsed,
       DateTime? lastCompletedAt,
+      DateTime? dueAt,
+      DateTime? snoozedUntil,
+      String? projectId,
+      String? goalId,
+      String? taskId,
       int currentStreak,
       int longestStreak,
       int totalCompletions});
@@ -96,6 +124,11 @@ class _$HabitCopyWithImpl<$Res, $Val extends Habit>
     Object? isArchived = null,
     Object? streakFreezesUsed = null,
     Object? lastCompletedAt = freezed,
+    Object? dueAt = freezed,
+    Object? snoozedUntil = freezed,
+    Object? projectId = freezed,
+    Object? goalId = freezed,
+    Object? taskId = freezed,
     Object? currentStreak = null,
     Object? longestStreak = null,
     Object? totalCompletions = null,
@@ -165,6 +198,26 @@ class _$HabitCopyWithImpl<$Res, $Val extends Habit>
           ? _value.lastCompletedAt
           : lastCompletedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      dueAt: freezed == dueAt
+          ? _value.dueAt
+          : dueAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      snoozedUntil: freezed == snoozedUntil
+          ? _value.snoozedUntil
+          : snoozedUntil // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      projectId: freezed == projectId
+          ? _value.projectId
+          : projectId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      goalId: freezed == goalId
+          ? _value.goalId
+          : goalId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      taskId: freezed == taskId
+          ? _value.taskId
+          : taskId // ignore: cast_nullable_to_non_nullable
+              as String?,
       currentStreak: null == currentStreak
           ? _value.currentStreak
           : currentStreak // ignore: cast_nullable_to_non_nullable
@@ -205,6 +258,11 @@ abstract class _$$HabitImplCopyWith<$Res> implements $HabitCopyWith<$Res> {
       bool isArchived,
       int streakFreezesUsed,
       DateTime? lastCompletedAt,
+      DateTime? dueAt,
+      DateTime? snoozedUntil,
+      String? projectId,
+      String? goalId,
+      String? taskId,
       int currentStreak,
       int longestStreak,
       int totalCompletions});
@@ -237,6 +295,11 @@ class __$$HabitImplCopyWithImpl<$Res>
     Object? isArchived = null,
     Object? streakFreezesUsed = null,
     Object? lastCompletedAt = freezed,
+    Object? dueAt = freezed,
+    Object? snoozedUntil = freezed,
+    Object? projectId = freezed,
+    Object? goalId = freezed,
+    Object? taskId = freezed,
     Object? currentStreak = null,
     Object? longestStreak = null,
     Object? totalCompletions = null,
@@ -306,6 +369,26 @@ class __$$HabitImplCopyWithImpl<$Res>
           ? _value.lastCompletedAt
           : lastCompletedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      dueAt: freezed == dueAt
+          ? _value.dueAt
+          : dueAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      snoozedUntil: freezed == snoozedUntil
+          ? _value.snoozedUntil
+          : snoozedUntil // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      projectId: freezed == projectId
+          ? _value.projectId
+          : projectId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      goalId: freezed == goalId
+          ? _value.goalId
+          : goalId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      taskId: freezed == taskId
+          ? _value.taskId
+          : taskId // ignore: cast_nullable_to_non_nullable
+              as String?,
       currentStreak: null == currentStreak
           ? _value.currentStreak
           : currentStreak // ignore: cast_nullable_to_non_nullable
@@ -342,6 +425,11 @@ class _$HabitImpl extends _Habit {
       required this.isArchived,
       required this.streakFreezesUsed,
       this.lastCompletedAt,
+      this.dueAt,
+      this.snoozedUntil,
+      this.projectId,
+      this.goalId,
+      this.taskId,
       required this.currentStreak,
       required this.longestStreak,
       required this.totalCompletions})
@@ -386,6 +474,34 @@ class _$HabitImpl extends _Habit {
   final int streakFreezesUsed;
   @override
   final DateTime? lastCompletedAt;
+
+  /// The moment this habit should next become due, set by a reschedule.
+  @override
+  final DateTime? dueAt;
+
+  /// While this is in the future the habit is held out of the workload, set
+  /// by a snooze.
+  @override
+  final DateTime? snoozedUntil;
+
+  /// The project this habit is filed under, if any.
+  ///
+  /// Optional and id-only: the project is looked up by [projectId] rather
+  /// than embedded, so the habit and project stay independently movable.
+  @override
+  final String? projectId;
+
+  /// The goal this habit is filed under, if any.
+  @override
+  final String? goalId;
+
+  /// The Task this habit has been migrated to, if any.
+  ///
+  /// When non-null, this Habit is the legacy representation of the Task.
+  /// The Task is the canonical recurring item; this Habit is retained for
+  /// rollback and audit but is excluded from user-facing recurring-work lists.
+  @override
+  final String? taskId;
   @override
   final int currentStreak;
   @override
@@ -395,7 +511,7 @@ class _$HabitImpl extends _Habit {
 
   @override
   String toString() {
-    return 'Habit(id: $id, title: $title, description: $description, category: $category, frequency: $frequency, customWeekdays: $customWeekdays, timeOfDay: $timeOfDay, targetCount: $targetCount, targetDuration: $targetDuration, cue: $cue, createdAt: $createdAt, updatedAt: $updatedAt, sortOrder: $sortOrder, isArchived: $isArchived, streakFreezesUsed: $streakFreezesUsed, lastCompletedAt: $lastCompletedAt, currentStreak: $currentStreak, longestStreak: $longestStreak, totalCompletions: $totalCompletions)';
+    return 'Habit(id: $id, title: $title, description: $description, category: $category, frequency: $frequency, customWeekdays: $customWeekdays, timeOfDay: $timeOfDay, targetCount: $targetCount, targetDuration: $targetDuration, cue: $cue, createdAt: $createdAt, updatedAt: $updatedAt, sortOrder: $sortOrder, isArchived: $isArchived, streakFreezesUsed: $streakFreezesUsed, lastCompletedAt: $lastCompletedAt, dueAt: $dueAt, snoozedUntil: $snoozedUntil, projectId: $projectId, goalId: $goalId, taskId: $taskId, currentStreak: $currentStreak, longestStreak: $longestStreak, totalCompletions: $totalCompletions)';
   }
 
   @override
@@ -432,6 +548,13 @@ class _$HabitImpl extends _Habit {
                 other.streakFreezesUsed == streakFreezesUsed) &&
             (identical(other.lastCompletedAt, lastCompletedAt) ||
                 other.lastCompletedAt == lastCompletedAt) &&
+            (identical(other.dueAt, dueAt) || other.dueAt == dueAt) &&
+            (identical(other.snoozedUntil, snoozedUntil) ||
+                other.snoozedUntil == snoozedUntil) &&
+            (identical(other.projectId, projectId) ||
+                other.projectId == projectId) &&
+            (identical(other.goalId, goalId) || other.goalId == goalId) &&
+            (identical(other.taskId, taskId) || other.taskId == taskId) &&
             (identical(other.currentStreak, currentStreak) ||
                 other.currentStreak == currentStreak) &&
             (identical(other.longestStreak, longestStreak) ||
@@ -459,6 +582,11 @@ class _$HabitImpl extends _Habit {
         isArchived,
         streakFreezesUsed,
         lastCompletedAt,
+        dueAt,
+        snoozedUntil,
+        projectId,
+        goalId,
+        taskId,
         currentStreak,
         longestStreak,
         totalCompletions
@@ -489,6 +617,11 @@ abstract class _Habit extends Habit {
       required final bool isArchived,
       required final int streakFreezesUsed,
       final DateTime? lastCompletedAt,
+      final DateTime? dueAt,
+      final DateTime? snoozedUntil,
+      final String? projectId,
+      final String? goalId,
+      final String? taskId,
       required final int currentStreak,
       required final int longestStreak,
       required final int totalCompletions}) = _$HabitImpl;
@@ -526,6 +659,34 @@ abstract class _Habit extends Habit {
   int get streakFreezesUsed;
   @override
   DateTime? get lastCompletedAt;
+  @override
+
+  /// The moment this habit should next become due, set by a reschedule.
+  DateTime? get dueAt;
+  @override
+
+  /// While this is in the future the habit is held out of the workload, set
+  /// by a snooze.
+  DateTime? get snoozedUntil;
+  @override
+
+  /// The project this habit is filed under, if any.
+  ///
+  /// Optional and id-only: the project is looked up by [projectId] rather
+  /// than embedded, so the habit and project stay independently movable.
+  String? get projectId;
+  @override
+
+  /// The goal this habit is filed under, if any.
+  String? get goalId;
+  @override
+
+  /// The Task this habit has been migrated to, if any.
+  ///
+  /// When non-null, this Habit is the legacy representation of the Task.
+  /// The Task is the canonical recurring item; this Habit is retained for
+  /// rollback and audit but is excluded from user-facing recurring-work lists.
+  String? get taskId;
   @override
   int get currentStreak;
   @override

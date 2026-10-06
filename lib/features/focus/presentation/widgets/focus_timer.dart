@@ -10,6 +10,7 @@ import '../../../../app/theme/text_styles.dart';
 import '../../../../app/widgets/glass_card.dart';
 import '../../../../app/widgets/glow_button.dart';
 import '../../../../app/widgets/pill_chip.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class FocusTimer extends ConsumerStatefulWidget {
   final FocusSession? session;
@@ -115,10 +116,18 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
     }
 
     final isWork = !session.isBreak;
-    final phaseColor = isWork ? colorScheme.primary : colorScheme.tertiary;
+    // The running ring is sky blue rather than `colorScheme.primary`. Primary
+    // is the colour of a *button*; the ring is the light the app is pouring
+    // into the session, and it has to be the brighter, more luminous blue to
+    // read that way. The light scheme keeps the deeper blue, where #0EA5E9
+    // would sit at 2.6:1 on pearl and fail the 3:1 floor for a graphical
+    // object. Breaks stay amber so the two phases never look alike.
+    final phaseColor = isWork
+        ? AppColors.accent(
+            colorScheme, AppColors.accentPrimaryDeep, AppColors.accentLiveDark)
+        : colorScheme.tertiary;
     final phaseLabel = isWork ? 'Focus' : 'Break';
-    final phaseIcon =
-        isWork ? Icons.center_focus_strong_rounded : Icons.coffee_outlined;
+    final phaseIcon = isWork ? LucideIcons.crosshair : LucideIcons.coffee;
 
     return _scrollIfNeeded(Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -161,7 +170,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
                       end: Alignment.bottomRight,
                       colors: [
                         colorScheme.primary.withValues(alpha: 0.22),
-                        AppColors.radiantViolet.withValues(alpha: 0.12),
+                        AppColors.accentDeep.withValues(alpha: 0.12),
                       ],
                     ),
                     border: Border.all(
@@ -170,7 +179,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
                   ),
                 ),
                 Icon(
-                  Icons.center_focus_strong_rounded,
+                  LucideIcons.crosshair,
                   size: 66,
                   color: colorScheme.primary,
                 ),
@@ -199,7 +208,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
         const SizedBox(height: AppSpacingTokens.xl),
         GlowButton(
           label: 'Start Session',
-          icon: Icons.play_arrow_rounded,
+          icon: LucideIcons.play,
           accent: colorScheme.primary,
           onPressed: widget.onStart,
         ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
@@ -207,7 +216,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
           const SizedBox(height: AppSpacingTokens.sm),
           TextButton.icon(
             onPressed: widget.onSettings,
-            icon: const Icon(Icons.settings_outlined, size: 18),
+            icon: const Icon(LucideIcons.settings, size: 18),
             label: const Text('Session Settings'),
             style: TextButton.styleFrom(
               foregroundColor: colorScheme.onSurfaceVariant,
@@ -238,14 +247,13 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
                   label: mode,
                   selected: state.selectedMode == mode,
                   icon: switch (mode) {
-                    'Pomodoro' => Icons.timer_outlined,
-                    'Custom' => Icons.tune_rounded,
-                    _ => Icons.hourglass_bottom_rounded,
+                    'Pomodoro' => LucideIcons.timer,
+                    'Custom' => LucideIcons.slidersHorizontal,
+                    _ => LucideIcons.hourglass,
                   },
                   accent: colorScheme.primary,
-                  onTap: () => ref
-                      .read(focusControllerProvider.notifier)
-                      .setMode(mode),
+                  onTap: () =>
+                      ref.read(focusControllerProvider.notifier).setMode(mode),
                 ),
             ],
           ),
@@ -403,7 +411,10 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
           ),
         ],
       ),
-    ).animate().fadeIn(duration: AppAnimationTokens.medium).slideY(begin: -0.1, end: 0);
+    )
+        .animate()
+        .fadeIn(duration: AppAnimationTokens.medium)
+        .slideY(begin: -0.1, end: 0);
   }
 
   Widget _buildTimerCircle(BuildContext context, double progress, Color color,
@@ -481,8 +492,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
                     // but a SweepGradient on a progress indicator jumps at the
                     // wrap point and reads as a glitch. A two-stop gradient along
                     // the arc stays smooth.
-                    Color.lerp(color, AppColors.radiantViolet, 0.45) ??
-                        color,
+                    Color.lerp(color, AppColors.accentDeep, 0.45) ?? color,
                   ),
                 ),
               ),
@@ -530,21 +540,21 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
         children: [
           _buildStatItem(
             context,
-            Icons.check_circle_outline,
+            LucideIcons.circleCheck,
             'Completed',
             '${session.completedSessions}',
             colorScheme.primary,
           ),
           _buildStatItem(
             context,
-            Icons.timer_outlined,
+            LucideIcons.timer,
             'Focus Time',
             '${session.totalWorkMinutes} min',
             colorScheme.tertiary,
           ),
           _buildStatItem(
             context,
-            Icons.repeat_outlined,
+            LucideIcons.repeat,
             'Cycle',
             '${session.completedSessions % session.sessionsBeforeLongBreak + 1}/${session.sessionsBeforeLongBreak}',
             colorScheme.secondary,
@@ -593,7 +603,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
         children: [
           OutlinedButton.icon(
             onPressed: widget.onDiscard,
-            icon: const Icon(Icons.close_rounded, size: 18),
+            icon: const Icon(LucideIcons.x, size: 18),
             label: const Text('Discard'),
             style: OutlinedButton.styleFrom(
               foregroundColor: theme.colorScheme.error,
@@ -605,7 +615,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
           const SizedBox(width: AppSpacingTokens.md),
           OutlinedButton.icon(
             onPressed: widget.onEnd,
-            icon: const Icon(Icons.flag_rounded, size: 18),
+            icon: const Icon(LucideIcons.flag, size: 18),
             label: const Text('End Session'),
             style: OutlinedButton.styleFrom(
               foregroundColor: theme.colorScheme.tertiary,
@@ -626,7 +636,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
             if (isPaused)
               GlowButton(
                 label: 'Resume',
-                icon: Icons.play_arrow_rounded,
+                icon: LucideIcons.play,
                 accent: phaseColor,
                 onPressed: widget.onResume,
                 height: 52,
@@ -634,7 +644,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
             else
               OutlinedButton.icon(
                 onPressed: widget.onPause,
-                icon: const Icon(Icons.pause_rounded, size: 20),
+                icon: const Icon(LucideIcons.pause, size: 20),
                 label: const Text('Pause'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
@@ -659,9 +669,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
             width: double.infinity,
             child: GlowButton(
               label: session.isBreak ? 'Start Focus' : 'Start Break',
-              icon: session.isBreak
-                  ? Icons.check_rounded
-                  : Icons.forward_rounded,
+              icon: session.isBreak ? LucideIcons.check : LucideIcons.forward,
               accent: session.isBreak
                   ? theme.colorScheme.primary
                   : theme.colorScheme.tertiary,

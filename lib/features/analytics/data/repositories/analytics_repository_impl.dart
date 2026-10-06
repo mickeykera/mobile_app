@@ -1,32 +1,48 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/extensions/date_extensions.dart';
 import '../../../focus/data/repositories/focus_repository_impl.dart';
-import '../../../focus/domain/entities/focus_session.dart';
 import '../../../focus/domain/repositories/focus_repository.dart';
-import '../../../habits/data/repositories/habit_repository_impl.dart';
+import '../../../habits/presentation/providers/habit_providers.dart';
 import '../../../habits/domain/entities/habit.dart';
+import '../../../habits/domain/entities/habit_completion.dart';
 import '../../../habits/domain/repositories/habit_repository.dart';
 import '../../../journal/data/repositories/journal_repository_impl.dart';
 import '../../../journal/domain/entities/journal_entry.dart';
 import '../../../journal/domain/repositories/journal_repository.dart';
+import '../../../progress/domain/services/progress_service.dart';
+import '../../../tasks/domain/entities/task.dart';
+import '../../../tasks/domain/repositories/task_repository.dart';
+import '../../../tasks/presentation/providers/task_providers.dart';
 import '../../domain/analytics_data.dart';
 import '../../domain/analytics_repository.dart';
 
 /// Aggregates the habit, focus and journal repositories into the read models
 /// consumed by the analytics screen.
+///
+/// Every derived number here comes from [ProgressService] rather than being
+/// summed inline, so this class stays an orchestration of reads and the metric
+/// definitions have exactly one home.
+///
+/// The habit and Task repositories are both needed because a migrated habit is
+/// only half a habit: its legacy record carries frozen counters, and its history
+/// lives in the Task occurrence log. Reading only one of them is what made this
+/// screen report stale streaks and a heatmap that stopped at the migration date.
 class AnalyticsRepositoryImpl implements AnalyticsRepository {
   final HabitRepository _habitRepository;
+  final TaskRepository _taskRepository;
   final FocusRepository _focusRepository;
   final JournalRepository _journalRepository;
+  final ProgressService _progress;
 
   AnalyticsRepositoryImpl(
     this._habitRepository,
+    this._taskRepository,
     this._focusRepository,
-    this._journalRepository,
-  );
+    this._journalRepository, [
+    this._progress = const ProgressService(),
+  ]);
 
   @override
   Future<Result<AnalyticsData>> getAnalyticsData({
@@ -39,6 +55,10 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     if (habitsResult.isLeft) return Either.left(habitsResult.left!);
     final habits = habitsResult.right!;
 
+    final completionsResult = await _recurringInputs();
+    if (completionsResult.isLeft) return Either.left(completionsResult.left!);
+    final (tasks, completions) = completionsResult.right!;
+
     final sessionsResult = await _focusRepository.getSessions(
         startDate: startDate, endDate: endDate);
     if (sessionsResult.isLeft) return Either.left(sessionsResult.left!);
@@ -49,74 +69,55 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     if (entriesResult.isLeft) return Either.left(entriesResult.left!);
     final entries = entriesResult.right!;
 
-    final habitHeatmapResult = await _habitHeatmapFor(habits, heatmapWeeks);
-    if (habitHeatmapResult.isLeft) return Either.left(habitHeatmapResult.left!);
-
     final focusHeatmapResult =
         await _focusRepository.getFocusHeatmap(weeks: heatmapWeeks);
     if (focusHeatmapResult.isLeft) return Either.left(focusHeatmapResult.left!);
 
+    final windowed = await _completionsIn(startDate, endDate);
+    if (windowed.isLeft) return Either.left(windowed.left!);
+
     final moodCorrelationResult =
-        await _correlationFor(habits, entries, 'mood', startDate, endDate);
+        await _correlationFor(habits, entries, windowed, 'mood');
     if (moodCorrelationResult.isLeft) {
       return Either.left(moodCorrelationResult.left!);
     }
 
     final energyCorrelationResult =
-        await _correlationFor(habits, entries, 'energy', startDate, endDate);
+        await _correlationFor(habits, entries, windowed, 'energy');
     if (energyCorrelationResult.isLeft) {
       return Either.left(energyCorrelationResult.left!);
     }
 
-    final categoryCompletions = <String, int>{};
-    final categoryStreaks = <String, int>{};
-    for (final habit in habits) {
-      categoryCompletions[habit.category] =
-          (categoryCompletions[habit.category] ?? 0) + habit.totalCompletions;
-      categoryStreaks[habit.category] =
-          (categoryStreaks[habit.category] ?? 0) + habit.currentStreak;
-    }
-
-    final focusByCategory = <String, int>{};
-    var totalFocusMinutes = 0;
-    for (final FocusSession session in sessions) {
-      totalFocusMinutes += session.totalWorkMinutes;
-      final category = session.projectName ?? 'Uncategorized';
-      focusByCategory[category] =
-          (focusByCategory[category] ?? 0) + session.totalWorkMinutes;
-    }
-
-    var moodSum = 0;
-    var moodCount = 0;
-    var energySum = 0;
-    var energyCount = 0;
-    for (final entry in entries) {
-      if (entry.moodRating != null) {
-        moodSum += entry.moodRating!;
-        moodCount++;
-      }
-      if (entry.energyRating != null) {
-        energySum += entry.energyRating!;
-        energyCount++;
-      }
-    }
+    final focus = _progress.focusBreakdown(sessions);
 
     return Either.right(AnalyticsData(
       startDate: startDate,
       endDate: endDate,
-      habitHeatmap: habitHeatmapResult.right!,
-      categoryCompletions: categoryCompletions,
-      categoryStreaks: categoryStreaks,
-      totalFocusMinutes: totalFocusMinutes,
-      focusByCategory: focusByCategory,
+      habitHeatmap: _progress.recurringCompletionHeatmap(
+        habits: habits,
+        completions: completions,
+        weeks: heatmapWeeks,
+      ),
+      categoryCompletions: _progress.recurringCompletionsByCategory(
+        habits: habits,
+        tasks: tasks,
+        completions: completions,
+      ),
+      categoryStreaks: _progress.recurringStreaksByCategory(
+        habits: habits,
+        tasks: tasks,
+        completions: completions,
+      ),
+      totalFocusMinutes: focus.totalMinutes,
+      focusByCategory: focus.byCategory,
       focusHeatmap: focusHeatmapResult.right!,
       journalEntriesCount: entries.length,
-      moodDistribution: _distribution(
-          entries.map((e) => e.moodRating), AppConstants.moodLevels),
-      energyDistribution: _distribution(
-          entries.map((e) => e.energyRating), AppConstants.energyLevels),
-      avgMood: moodCount == 0 ? 0 : moodSum / moodCount,
-      avgEnergy: energyCount == 0 ? 0 : energySum / energyCount,
+      moodDistribution:
+          _progress.moodDistribution(entries.map((e) => e.moodRating)),
+      energyDistribution:
+          _progress.energyDistribution(entries.map((e) => e.energyRating)),
+      avgMood: _progress.averageRating(entries.map((e) => e.moodRating)),
+      avgEnergy: _progress.averageRating(entries.map((e) => e.energyRating)),
       moodHabitCorrelation: moodCorrelationResult.right!,
       energyHabitCorrelation: energyCorrelationResult.right!,
     ));
@@ -127,21 +128,27 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     final habitsResult =
         await _habitRepository.getAllHabits(includeArchived: true);
     if (habitsResult.isLeft) return Either.left(habitsResult.left!);
-    return _habitHeatmapFor(habitsResult.right!, weeks);
+
+    final completionsResult = await _habitRepository.getAllCompletions();
+    if (completionsResult.isLeft) return Either.left(completionsResult.left!);
+
+    return Either.right(_progress.recurringCompletionHeatmap(
+      habits: habitsResult.right!,
+      completions: completionsResult.right!,
+      weeks: weeks,
+    ));
   }
 
-  Future<Result<Map<DateTime, int>>> _habitHeatmapFor(
-      List<Habit> habits, int weeks) async {
-    final merged = <DateTime, int>{};
-    for (final habit in habits) {
-      final result =
-          await _habitRepository.getCompletionHeatmap(habit.id, weeks: weeks);
-      if (result.isLeft) return Either.left(result.left!);
-      result.right!.forEach((day, count) {
-        merged[day] = (merged[day] ?? 0) + count;
-      });
-    }
-    return Either.right(merged);
+  /// The Task list and the whole completion log, which are the two halves of a
+  /// recurring item's history after migration.
+  Future<Result<(List<Task>, List<HabitCompletion>)>> _recurringInputs() async {
+    final tasksResult = await _taskRepository.getAllTasks();
+    if (tasksResult.isLeft) return Either.left(tasksResult.left!);
+
+    final completionsResult = await _habitRepository.getAllCompletions();
+    if (completionsResult.isLeft) return Either.left(completionsResult.left!);
+
+    return Either.right((tasksResult.right!, completionsResult.right!));
   }
 
   @override
@@ -153,23 +160,31 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
         await _habitRepository.getAllHabits(includeArchived: true);
     if (habitsResult.isLeft) return Either.left(habitsResult.left!);
 
-    final byCategory = <String, int>{};
-    for (final habit in habitsResult.right!) {
-      if (startDate == null && endDate == null) {
-        byCategory[habit.category] =
-            (byCategory[habit.category] ?? 0) + habit.totalCompletions;
-        continue;
-      }
-      final completionsResult = await _habitRepository.getCompletionsForHabit(
-          habit.id,
-          startDate: startDate,
-          endDate: endDate);
-      if (completionsResult.isLeft) return Either.left(completionsResult.left!);
-      final count =
-          completionsResult.right!.fold<int>(0, (sum, c) => sum + c.count);
-      byCategory[habit.category] = (byCategory[habit.category] ?? 0) + count;
+    final habits = habitsResult.right!;
+
+    // No window means "all time", which the habits already carry as a lifetime
+    // counter; a window has to be counted from the log instead.
+    if (startDate == null && endDate == null) {
+      final recurringResult = await _recurringInputs();
+      if (recurringResult.isLeft) return Either.left(recurringResult.left!);
+      final (tasks, completions) = recurringResult.right!;
+      return Either.right(_progress.recurringCompletionsByCategory(
+        habits: habits,
+        tasks: tasks,
+        completions: completions,
+      ));
     }
-    return Either.right(byCategory);
+
+    final allCompletionsResult = await _habitRepository.getAllCompletions();
+    if (allCompletionsResult.isLeft) {
+      return Either.left(allCompletionsResult.left!);
+    }
+    return Either.right(_progress.recurringCompletionsByCategoryFromLog(
+      habits: habits,
+      completions: allCompletionsResult.right!,
+      startDate: startDate,
+      endDate: endDate,
+    ));
   }
 
   @override
@@ -178,12 +193,15 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
         await _habitRepository.getAllHabits(includeArchived: true);
     if (habitsResult.isLeft) return Either.left(habitsResult.left!);
 
-    final byCategory = <String, int>{};
-    for (final habit in habitsResult.right!) {
-      byCategory[habit.category] =
-          (byCategory[habit.category] ?? 0) + habit.currentStreak;
-    }
-    return Either.right(byCategory);
+    final recurringResult = await _recurringInputs();
+    if (recurringResult.isLeft) return Either.left(recurringResult.left!);
+    final (tasks, completions) = recurringResult.right!;
+
+    return Either.right(_progress.recurringStreaksByCategory(
+      habits: habitsResult.right!,
+      tasks: tasks,
+      completions: completions,
+    ));
   }
 
   @override
@@ -234,7 +252,8 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     final result = await _journalRepository.getEntries(
         startDate: startDate, endDate: endDate);
     if (result.isLeft) return Either.left(result.left!);
-    return Either.right(_average(result.right!.map((e) => e.moodRating)));
+    return Either.right(
+        _progress.averageRating(result.right!.map((e) => e.moodRating)));
   }
 
   @override
@@ -243,7 +262,8 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     final result = await _journalRepository.getEntries(
         startDate: startDate, endDate: endDate);
     if (result.isLeft) return Either.left(result.left!);
-    return Either.right(_average(result.right!.map((e) => e.energyRating)));
+    return Either.right(
+        _progress.averageRating(result.right!.map((e) => e.energyRating)));
   }
 
   @override
@@ -276,7 +296,11 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     if (entriesResult.isLeft) return Either.left(entriesResult.left!);
 
     return _correlationFor(
-        habitsResult.right!, entriesResult.right!, type, startDate, endDate);
+      habitsResult.right!,
+      entriesResult.right!,
+      await _completionsIn(startDate, endDate),
+      type,
+    );
   }
 
   /// Pairs each journal rating with the share of habits that were completed on
@@ -284,21 +308,19 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
   Future<Result<List<CorrelationPoint>>> _correlationFor(
     List<Habit> habits,
     List<JournalEntry> entries,
+    Result<List<HabitCompletion>> completionsResult,
     String type,
-    DateTime? startDate,
-    DateTime? endDate,
   ) async {
-    final completionsByDay = <DateTime, Set<String>>{};
-    for (final habit in habits) {
-      final result = await _habitRepository.getCompletionsForHabit(habit.id,
-          startDate: startDate, endDate: endDate);
-      if (result.isLeft) return Either.left(result.left!);
-      for (final completion in result.right!) {
-        completionsByDay
-            .putIfAbsent(completion.completedAt.startOfDay, () => <String>{})
-            .add(completion.habitId);
-      }
+    if (completionsResult.isLeft) {
+      return Either.left(completionsResult.left!);
     }
+
+    // Resolved through the same ownership map the category and heatmap reads
+    // use, so a migrated habit is credited its Task rows and charged only once.
+    final completionsByDay = _progress.completedHabitIdsByDay(
+      completionsResult.right!,
+      ProgressService.habitIdByTaskId(habits),
+    );
 
     final points = <CorrelationPoint>[];
     for (final entry in entries) {
@@ -306,15 +328,16 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
       if (rating == null) continue;
 
       final date = entry.date.startOfDay;
-      final dueHabits = habits.where((h) => h.isDueOnDate(date)).toList();
-      if (dueHabits.isEmpty) continue;
-
-      final completed = completionsByDay[date] ?? const <String>{};
-      final completedDue =
-          dueHabits.where((h) => completed.contains(h.id)).length;
+      final percent = _progress.dayHabitCompletionPercent(
+        habits: habits,
+        completedByDay: completionsByDay,
+        day: date,
+      );
+      // Nothing was due that day, so there is no completion share to correlate.
+      if (percent == null) continue;
 
       points.add(CorrelationPoint(
-        x: completedDue / dueHabits.length * 100,
+        x: percent,
         y: rating.toDouble(),
         label: date.formatRelative(),
       ));
@@ -324,33 +347,29 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     return Either.right(points);
   }
 
-  static double _average(Iterable<int?> ratings) {
-    var sum = 0;
-    var count = 0;
-    for (final rating in ratings) {
-      if (rating == null) continue;
-      sum += rating;
-      count++;
+  /// Completion rows inside an optional window.
+  ///
+  /// A window is applied here, on the shared log, rather than by asking the
+  /// repository once per habit. Two consequences worth stating: it is one query
+  /// instead of one per habit, and it sees Task rows for migrated habits, which
+  /// the per-habit query structurally cannot return.
+  Future<Result<List<HabitCompletion>>> _completionsIn(
+    DateTime? startDate,
+    DateTime? endDate,
+  ) async {
+    if (startDate == null || endDate == null) {
+      return _habitRepository.getAllCompletions();
     }
-    return count == 0 ? 0 : sum / count;
-  }
-
-  static Map<String, int> _distribution(
-      Iterable<int?> ratings, List<String> labels) {
-    final distribution = <String, int>{};
-    for (final rating in ratings) {
-      if (rating == null || rating < 1 || rating > labels.length) continue;
-      final label = labels[rating - 1];
-      distribution[label] = (distribution[label] ?? 0) + 1;
-    }
-    return distribution;
+    return _habitRepository.getCompletionsInRange(startDate, endDate);
   }
 }
 
 final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {
   return AnalyticsRepositoryImpl(
     ref.watch(habitRepositoryProvider),
+    ref.watch(taskRepositoryProvider),
     ref.watch(focusRepositoryProvider),
     ref.watch(journalRepositoryProvider),
+    ref.watch(progressServiceProvider),
   );
 });

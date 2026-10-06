@@ -8,22 +8,36 @@ import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'theme/text_styles.dart';
 import 'widgets/pressable.dart';
+import '../features/today/presentation/screens/today_screen.dart';
+import '../features/goals/presentation/screens/goals_screen.dart';
+import '../features/projects/presentation/screens/project_detail_screen.dart';
+import '../features/projects/presentation/screens/projects_screen.dart';
+import '../features/tasks/presentation/screens/tasks_screen.dart';
 import '../features/habits/presentation/screens/habits_screen.dart';
 import '../features/focus/presentation/screens/focus_screen.dart';
 import '../features/journal/presentation/screens/journal_screen.dart';
 import '../features/analytics/presentation/screens/analytics_screen.dart';
 import '../features/premium/presentation/screens/premium_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/habits',
+    initialLocation: '/today',
     routes: [
       ShellRoute(
         builder: (context, state, child) => _MainShell(child: child),
         routes: [
           GoRoute(
+            path: '/today',
+            builder: (context, state) => const TodayScreen(),
+          ),
+          GoRoute(
             path: '/habits',
             builder: (context, state) => const HabitsScreen(),
+          ),
+          GoRoute(
+            path: '/tasks',
+            builder: (context, state) => const TasksScreen(),
           ),
           GoRoute(
             path: '/focus',
@@ -42,6 +56,23 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const PremiumScreen(),
           ),
         ],
+      ),
+      // Drilldowns live outside the shell so the seven-item tab bar does not
+      // follow you down into a single goal or project. They are pushed on top of
+      // a tab, not added to it.
+      GoRoute(
+        path: '/goals',
+        builder: (context, state) => const GoalsScreen(),
+      ),
+      GoRoute(
+        path: '/projects',
+        builder: (context, state) => const ProjectsScreen(),
+      ),
+      GoRoute(
+        path: '/projects/:id',
+        builder: (context, state) => ProjectDetailScreen(
+          projectId: state.pathParameters['id']!,
+        ),
       ),
     ],
   );
@@ -64,34 +95,53 @@ class _MainShellState extends ConsumerState<_MainShell> {
   /// label from one tab next to another tab's icon.
   static const _destinations = [
     _NavDestination(
+      location: '/today',
+      label: 'Today',
+      icon: LucideIcons.layoutDashboard,
+      accent: AppColors.accentWarmDeep,
+      accentDark: AppColors.accentWarm,
+    ),
+    _NavDestination(
       location: '/habits',
       label: 'Habits',
-      icon: Icons.track_changes_rounded,
-      accent: AppColors.neonCyan,
+      icon: LucideIcons.target,
+      accent: AppColors.accentPrimaryDeep,
+      accentDark: AppColors.accentPrimary,
+    ),
+    _NavDestination(
+      location: '/tasks',
+      label: 'Tasks',
+      icon: LucideIcons.listChecks,
+      accent: AppColors.accentLiveDeep,
+      accentDark: AppColors.accentLive,
     ),
     _NavDestination(
       location: '/focus',
       label: 'Focus',
-      icon: Icons.center_focus_strong_rounded,
-      accent: AppColors.radiantViolet,
+      icon: LucideIcons.crosshair,
+      accent: AppColors.accentDeep,
+      accentDark: AppColors.accentDeepDark,
     ),
     _NavDestination(
       location: '/journal',
       label: 'Journal',
-      icon: Icons.book_outlined,
-      accent: AppColors.emerald,
+      icon: LucideIcons.bookOpen,
+      accent: AppColors.accentLiveDeep,
+      accentDark: AppColors.accentLiveDark,
     ),
     _NavDestination(
       location: '/analytics',
       label: 'Analytics',
-      icon: Icons.analytics_outlined,
-      accent: AppColors.coralOrange,
+      icon: LucideIcons.chartNoAxesColumn,
+      accent: AppColors.accentWarmDeep,
+      accentDark: AppColors.accentWarm,
     ),
     _NavDestination(
       location: '/premium',
       label: 'Premium',
-      icon: Icons.diamond_outlined,
-      accent: AppColors.radiantViolet,
+      icon: LucideIcons.diamond,
+      accent: AppColors.accentDeep,
+      accentDark: AppColors.accentDeepDark,
     ),
   ];
 
@@ -125,13 +175,23 @@ class _NavDestination {
 
   /// Each tab owns a colour so the bar is not five identical grey icons, and so
   /// the selected tab is identifiable by hue as well as by position.
+  ///
+  /// Held as a light/dark pair rather than one value because the bar is a
+  /// blurred sheet: the colour has to clear 3:1 against *near-white glass* in
+  /// light mode and against *obsidian glass* in dark mode, and the neon accents
+  /// that work on obsidian only manage 2.6:1 on the light one.
   final Color accent;
+  final Color accentDark;
+
+  Color resolve(ColorScheme scheme) =>
+      AppColors.accent(scheme, accent, accentDark);
 
   const _NavDestination({
     required this.location,
     required this.label,
     required this.icon,
     required this.accent,
+    required this.accentDark,
   });
 }
 
@@ -212,7 +272,7 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = destination.accent;
+    final accent = destination.resolve(theme.colorScheme);
     final color = selected
         ? accent
         : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7);
@@ -247,8 +307,7 @@ class _NavItem extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: selected ? 0.18 : 0),
-                  borderRadius:
-                      BorderRadius.circular(AppRadiusTokens.full),
+                  borderRadius: BorderRadius.circular(AppRadiusTokens.full),
                   boxShadow: selected
                       ? [
                           BoxShadow(

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../../core/constants/category_type.dart';
+import '../../../../core/utils/app_clock.dart';
 import '../../../../core/utils/id_generator.dart';
+import '../../../tasks/domain/value_objects/task_schedule.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 part 'habit.freezed.dart';
 
@@ -25,6 +28,29 @@ abstract class Habit with _$Habit {
     required bool isArchived,
     required int streakFreezesUsed,
     DateTime? lastCompletedAt,
+
+    /// The moment this habit should next become due, set by a reschedule.
+    DateTime? dueAt,
+
+    /// While this is in the future the habit is held out of the workload, set
+    /// by a snooze.
+    DateTime? snoozedUntil,
+
+    /// The project this habit is filed under, if any.
+    ///
+    /// Optional and id-only: the project is looked up by [projectId] rather
+    /// than embedded, so the habit and project stay independently movable.
+    String? projectId,
+
+    /// The goal this habit is filed under, if any.
+    String? goalId,
+
+    /// The Task this habit has been migrated to, if any.
+    ///
+    /// When non-null, this Habit is the legacy representation of the Task.
+    /// The Task is the canonical recurring item; this Habit is retained for
+    /// rollback and audit but is excluded from user-facing recurring-work lists.
+    String? taskId,
     required int currentStreak,
     required int longestStreak,
     required int totalCompletions,
@@ -43,8 +69,11 @@ abstract class Habit with _$Habit {
     Duration targetDuration = const Duration(minutes: 0),
     String cue = '',
     int sortOrder = 0,
+    String? projectId,
+    String? goalId,
+    String? taskId,
   }) {
-    final now = DateTime.now();
+    final now = AppClock.now();
     return Habit(
       id: IdGenerator.generateHabitId(),
       title: title,
@@ -62,32 +91,57 @@ abstract class Habit with _$Habit {
       isArchived: false,
       streakFreezesUsed: 0,
       lastCompletedAt: null,
+      projectId: projectId,
+      goalId: goalId,
+      taskId: taskId,
       currentStreak: 0,
       longestStreak: 0,
       totalCompletions: 0,
     );
   }
 
-  bool get isDueToday => isDueOnDate(DateTime.now());
+  bool get isDueToday => isDueOnDate(AppClock.now());
 
-  bool isDueOnDate(DateTime date) {
-    final weekday = date.weekday;
-
-    switch (frequency) {
-      case 'Daily':
-        return true;
-      case 'Weekdays':
-        return weekday >= 1 && weekday <= 5;
-      case 'Weekends':
-        return weekday >= 6 && weekday <= 7;
-      case 'Custom':
-        return customWeekdays.contains(weekday);
-      default:
-        return false;
-    }
+  /// Whether an active snooze is holding this habit out of the workload.
+  ///
+  /// Snoozing is not completing: the completion history is untouched and the
+  /// habit simply stops counting as due until the hold elapses. An expired
+  /// [snoozedUntil] is inert, so nothing has to be cleared for the habit to
+  /// come back.
+  bool get isSnoozed {
+    final until = snoozedUntil;
+    return until != null && until.isAfter(AppClock.now());
   }
 
-  bool get isCompletedToday => isCompletedOn(DateTime.now());
+  /// The instant an active snooze ends, or null when the habit is not snoozed.
+  DateTime? get activeSnoozeUntil => isSnoozed ? snoozedUntil : null;
+
+  /// This habit expressed in the shared schedule vocabulary.
+  ///
+  /// A habit persists its recurrence as flat `frequency` / `customWeekdays`
+  /// strings, so this is where those become a [Recurring]. It exists as a getter
+  /// rather than being inlined at each use because [isDueOnDate] and the
+  /// Stage G read model both need the *same* instance: rebuilding it in two
+  /// places is how two call sites end up disagreeing about whether a habit is
+  /// due, which is the bug this refactor removed once already.
+  Recurring get recurringSchedule => Recurring(
+        RecurrenceRule.fromFrequency(frequency, customWeekdays),
+        dueAt: dueAt,
+        snoozedUntil: snoozedUntil,
+      );
+
+  /// Whether this habit is scheduled on [date].
+  ///
+  /// The recurrence and the today-forward [snoozedUntil]/[dueAt] overrides are
+  /// evaluated by [Recurring], which is the single definition of due-ness. This
+  /// used to re-implement the frequency switch here, which is how the week
+  /// strip and the Today list were able to disagree once schedules gained
+  /// overrides.
+  bool isDueOnDate(DateTime date) {
+    return recurringSchedule.isDueOn(date, now: AppClock.now());
+  }
+
+  bool get isCompletedToday => isCompletedOn(AppClock.now());
 
   bool isCompletedOn(DateTime date) {
     final last = lastCompletedAt;
@@ -97,7 +151,7 @@ abstract class Habit with _$Habit {
 
   double get completionRate {
     if (totalCompletions == 0) return 0.0;
-    final daysSinceCreation = DateTime.now().difference(createdAt).inDays + 1;
+    final daysSinceCreation = AppClock.now().difference(createdAt).inDays + 1;
     final expectedCompletions =
         (daysSinceCreation / 7 * _getWeeklyFrequency()).ceil();
     if (expectedCompletions == 0) return 1.0;
@@ -124,13 +178,13 @@ abstract class Habit with _$Habit {
     DateTime? completionTime,
   }) {
     if (completed) {
-      final newStreak = _calculateNewStreak(completionTime ?? DateTime.now());
+      final newStreak = _calculateNewStreak(completionTime ?? AppClock.now());
       return copyWith(
-        lastCompletedAt: completionTime ?? DateTime.now(),
+        lastCompletedAt: completionTime ?? AppClock.now(),
         currentStreak: newStreak,
         longestStreak: newStreak > longestStreak ? newStreak : longestStreak,
         totalCompletions: totalCompletions + 1,
-        updatedAt: DateTime.now(),
+        updatedAt: AppClock.now(),
       );
     } else {
       return copyWithUncompletion();
@@ -158,7 +212,7 @@ abstract class Habit with _$Habit {
       // Once nothing is left, the completion timestamp has to go too, or
       // `isCompletedOn` would keep reporting the day as done.
       lastCompletedAt: newTotal > 0 ? lastCompletedAt : null,
-      updatedAt: DateTime.now(),
+      updatedAt: AppClock.now(),
     );
   }
 
@@ -178,7 +232,7 @@ abstract class Habit with _$Habit {
   Habit useStreakFreeze() {
     return copyWith(
       streakFreezesUsed: streakFreezesUsed + 1,
-      updatedAt: DateTime.now(),
+      updatedAt: AppClock.now(),
     );
   }
 
@@ -192,11 +246,18 @@ abstract class Habit with _$Habit {
   ///
   /// The mapping now lives on [CategoryType] so the colour for a given
   /// category is defined in exactly one place.
-  int get categoryColorValue =>
-      CategoryType.fromString(category).colorValue;
+  int get categoryColorValue => CategoryType.fromString(category).colorValue;
 
   Color get categoryColor => CategoryType.fromString(category).color;
 
+  /// Category colour for the current theme.
+  ///
+  /// Prefer this over [categoryColor] in widgets: the two schemes need
+  /// different values, and the light-scheme-only getter quietly fails on the
+  /// dark surface.
+  Color categoryColorFor(Brightness brightness) =>
+      CategoryType.fromString(category).colorFor(brightness);
+
   IconData get categoryIcon =>
-      CategoryType.tryFromString(category)?.icon ?? Icons.star_outline;
+      CategoryType.tryFromString(category)?.icon ?? LucideIcons.star;
 }

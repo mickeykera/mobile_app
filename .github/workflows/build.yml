@@ -6,8 +6,13 @@ name: Build
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -20,7 +25,6 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: '3.47.5'
           cache: true
 
       - uses: actions/setup-java@v4
@@ -31,7 +35,10 @@ jobs:
       # The keystore and its passwords are gitignored, so CI has to be given
       # them. Decode the base64 keystore from KEYSTORE_BASE64 into the same
       # path key.properties expects.
-      - name: Restore signing key
+      # If KEYSTORE_BASE64 is not provided, we fall back to debug signing
+      # (which is NOT publishable to Play, but useful for CI verification).
+      - name: Restore signing key (optional)
+        if: env.KEYSTORE_BASE64 != ''
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -45,7 +52,13 @@ jobs:
           storeFile=$RUNNER_TEMP/release.jks
           EOF
 
-      - name: Test
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
         run: flutter test
 
       - name: Build release APK
@@ -58,6 +71,7 @@ jobs:
       # config falls back to the debug key when key.properties is missing,
       # which builds fine but is rejected by Play.
       - name: Verify APK is signed with the release key
+        if: env.KEYSTORE_BASE64 != ''
         run: |
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
           if [ -z "$APKSIGNER" ]; then
@@ -81,14 +95,16 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.apk
+          name: Ascend-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.aab
+          name: Ascend-AAB
           path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 14
 
   ios:
     name: iOS (unsigned build)
@@ -99,7 +115,6 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: '3.47.5'
           cache: true
 
       # An .ipa is a zip around a code signature, and Apple only issues
@@ -107,6 +122,15 @@ jobs:
       # prove the iOS target compiles, so this always runs and produces a
       # .app. A .app with no signature cannot be installed on a device -
       # it is for verifying the build, not for distribution.
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test
+
       - name: Build iOS app (unsigned)
         run: flutter build ios --release --no-codesign
 
@@ -140,13 +164,13 @@ jobs:
           mkdir -p build/ios/ipa_unsigned/Payload
           cp -R build/ios/iphoneos/Runner.app build/ios/ipa_unsigned/Payload/
           cd build/ios/ipa_unsigned
-          zip -qry ../app-unsigned.ipa Payload
+          zip -qry ../Ascend-unsigned.ipa Payload
           cd - > /dev/null
-          ls -la build/ios/app-unsigned.ipa
+          ls -la build/ios/Ascend-unsigned.ipa
 
       - name: Verify the IPA structure
         run: |
-          IPA=build/ios/app-unsigned.ipa
+          IPA=build/ios/Ascend-unsigned.ipa
           if [ ! -f "$IPA" ]; then
             echo "::error::ipa was not produced"
             exit 1
@@ -164,8 +188,8 @@ jobs:
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: app-unsigned.ipa
-          path: build/ios/app-unsigned.ipa
+          name: Ascend-iOS-Unsigned
+          path: build/ios/Ascend-unsigned.ipa
           retention-days: 14
 
 
