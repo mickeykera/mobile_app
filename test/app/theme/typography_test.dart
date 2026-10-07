@@ -87,6 +87,7 @@ void main() {
     final audited = <String>{
       'activity',
       'alarmClock',
+      'alertTriangle',
       'archive',
       'archiveRestore',
       'arrowRight',
