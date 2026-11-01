@@ -426,10 +426,6 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
 
   Widget _buildTimerCircle(BuildContext context, double progress, Color color,
       FocusSession session) {
-    final theme = Theme.of(context);
-    final formattedTime =
-        session.isBreak ? session.formattedRemaining : session.formattedElapsed;
-
     // The halo breathes outside the ring so the progress arc itself stays a
     // precise instrument - scaling the ring would make the arc harder to read at
     // a glance, which is the one job it has.
