@@ -145,7 +145,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                         .scaleXY(
                           begin: 1,
                           end: 1.08,
-                          duration: 1800.ms,
+                          duration: AppAnimationTokens.verySlow,
                           curve: Curves.easeInOut,
                         ),
                   ),

@@ -70,11 +70,22 @@ class AppAnimationTokens {
   /// Entrance staggers and larger layout changes.
   static const Duration slow = Duration(milliseconds: 350);
 
+  /// Very slow: intentional looping CTAs (Premium gem, loading pulse).
+  static const Duration verySlow = Duration(milliseconds: 1800);
+
+  /// Breathing pace for focus timer ring (4s each way = 8s full cycle).
+  /// Slower than verySlow to feel like a calm breath, not a pulse.
+  static const Duration breath = Duration(milliseconds: 4000);
+
   /// The scale a [Pressable] shrinks to while held.
   static const double pressScale = 0.96;
 
   /// Delay between consecutive children in a staggered list.
   static const Duration stagger = Duration(milliseconds: 55);
+
+  /// Maximum items to stagger; items beyond this appear together.
+  /// Prevents frame spikes on long lists.
+  static const int maxStaggerItems = 7;
 }
 
 class AppTheme {

@@ -12,10 +12,6 @@ import 'package:ascend/features/recurring/presentation/providers/recurring_provi
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AscendScrollBehavior extends MaterialScrollBehavior {
-  /// Android 12+ draws a stretchy overscroll by default, which pulls the whole
-  /// page past its bounds and looks broken on a screen that is mostly a
-  /// gradient header. A glow indicator is used on Android instead, and iOS
-  /// keeps its native bounce.
   const AscendScrollBehavior();
 
   @override
@@ -24,8 +20,6 @@ class AscendScrollBehavior extends MaterialScrollBehavior {
     Widget child,
     ScrollableDetails details,
   ) {
-    // A glow tints the edge; the Android 12+ default instead scales and
-    // deforms the content, which is the "stretches when I scroll" effect.
     switch (details.direction) {
       case AxisDirection.down:
         return GlowingOverscrollIndicator(
@@ -46,14 +40,6 @@ class AscendScrollBehavior extends MaterialScrollBehavior {
   }
 }
 
-/// Stateful only so Retry can start a *new* `initialize()` future.
-///
-/// This has to be state *here*, not in the error screen. `FutureBuilder`
-/// compares the new `future` against the old one and restarts only if it
-/// changed, so the retry needs to replace the future on the widget that owns
-/// the builder. Rebuilding `_ErrorScreen` alone - which is what a `setState`
-/// inside it does - hands the builder the identical future it already
-/// completed, and the user taps Retry and nothing happens.
 class AscendApp extends ConsumerStatefulWidget {
   const AscendApp({super.key});
 
@@ -64,23 +50,13 @@ class AscendApp extends ConsumerStatefulWidget {
 class _AscendAppState extends ConsumerState<AscendApp> {
   static const _scrollBehavior = AscendScrollBehavior();
 
-  /// Bumped by Retry. The future is derived from it during build rather than
-  /// created in the tap handler - see [_databaseFuture].
   int _attempt = 0;
-
-  /// The attempt number [_databaseFuture] was built for.
   int _futureForAttempt = -1;
   Future<void>? _databaseFuture;
 
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
-    // The future is created *here*, in the same synchronous pass that hands it
-    // to the `FutureBuilder` below, so the builder can subscribe before the
-    // future completes. Creating it inside the Retry handler instead leaves a
-    // gap: `setState` only schedules a rebuild, so a fast-failing future
-    // completes in a microtask with nothing listening, and Dart reports the
-    // error as unhandled even though the builder is about to handle it.
     if (_futureForAttempt != _attempt) {
       _futureForAttempt = _attempt;
       _databaseFuture = _initialize();
@@ -127,44 +103,176 @@ class _AscendAppState extends ConsumerState<AscendApp> {
     );
   }
 
-  /// Brings storage up to the current schema, then runs the Habit -> Task
-  /// migration if this install has not completed it.
-  ///
-  /// Both steps are in the one future that gates the first frame, and the order
-  /// matters: the migration resolves its repositories through `ref`, so it must
-  /// be the *same* cached provider instances the UI will later read through.
-  /// Running it first means the repositories hydrate once, already migrated, and
-  /// no two in-memory copies of the habit list can race a write.
-  ///
-  /// The migration short-circuits on a stored marker, so every launch after the
-  /// first costs one key read. See [HabitTaskMigrationRunner] for why this is
-  /// awaited rather than left in the background.
   Future<void> _initialize() async {
     await ref.read(databaseServiceProvider).initialize();
     await ref.read(habitTaskMigrationRunnerProvider).runIfRequired();
   }
 
-  /// `DatabaseService.initialize` short-circuits on its own `_isInitialized`
-  /// flag, and a failed attempt leaves that flag false, so calling it again
-  /// genuinely re-runs `SharedPreferences.getInstance()`.
   void _retry() => setState(() => _attempt++);
 }
 
-class _LoadingScreen extends StatelessWidget {
+class _LoadingScreen extends StatefulWidget {
   const _LoadingScreen();
 
   @override
+  State<_LoadingScreen> createState() => _LoadingScreenState();
+}
+
+class _LoadingScreenState extends State<_LoadingScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool _shouldAnimate = true;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      final disableAnimations = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      _shouldAnimate = !disableAnimations;
+      if (_shouldAnimate) {
+        _controller.repeat();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<Widget> _buildLoaderChildren(Color accentColor, bool shouldAnimate, AnimationController controller) {
+    if (!shouldAnimate) {
+      return [
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: accentColor, width: 2.5),
+          ),
+        ),
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: accentColor.withValues(alpha: 0.12),
+            border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+          ),
+          child: Icon(LucideIcons.trendingUp, size: 28, color: accentColor),
+        ),
+      ];
+    }
+
+    return [
+      AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          final progress = controller.value;
+          double scale, opacity;
+          if (progress < 0.5) {
+            scale = 0.6 + progress * 0.8;
+            opacity = 0.4 - progress * 0.3;
+          } else {
+            scale = 1.0 - (progress - 0.5) * 0.6;
+            opacity = 0.25 - (progress - 0.5) * 0.25;
+          }
+          return Transform.scale(
+            scale: scale,
+            child: Opacity(
+              opacity: opacity,
+              child: Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: accentColor, width: 2.5),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+      AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          final progress = (controller.value + 0.3) % 1.0;
+          double scale, opacity;
+          if (progress < 0.5) {
+            scale = 0.5 + progress * 0.7;
+            opacity = 0.35 - progress * 0.25;
+          } else {
+            scale = 0.85 - (progress - 0.5) * 0.45;
+            opacity = 0.225 - (progress - 0.5) * 0.225;
+          }
+          return Transform.scale(
+            scale: scale,
+            child: Opacity(
+              opacity: opacity,
+              child: Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: accentColor.withValues(alpha: 0.7), width: 2),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+      AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          final pulse = 0.95 + 0.05 * (1 - (controller.value * 2).clamp(0.0, 1.0)).abs();
+          return Transform.scale(
+            scale: pulse,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accentColor.withValues(alpha: 0.12),
+                border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+              ),
+              child: Icon(LucideIcons.trendingUp, size: 28, color: accentColor),
+            ),
+          );
+        },
+      ),
+    ];
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final bgColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final accentColor = isDark ? AppColors.accentPrimaryDark : AppColors.accentPrimary;
+
     return Scaffold(
+      backgroundColor: bgColor,
       body: Stack(
         children: [
-          const Positioned.fill(
+          Positioned.fill(
             child: ColoredBox(
-              color: AppColors.surfaceDark,
+              color: bgColor,
               child: AuroraBackdrop(
-                accentA: AppColors.accentPrimary,
-                accentB: AppColors.accentDeep,
-                opacity: 0.18,
+                accentA: accentColor,
+                accentB: isDark ? AppColors.accentDeepDark : AppColors.accentDeep,
+                opacity: isDark ? 0.18 : 0.08,
               ),
             ),
           ),
@@ -172,64 +280,17 @@ class _LoadingScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // The mark pulses rather than sitting behind a spinner: it is
-                // the first thing seen on launch, and a still logo plus a
-                // spinning circle reads as a blocked app.
                 SizedBox(
                   width: 96,
                   height: 96,
                   child: Stack(
                     alignment: Alignment.center,
-                    children: [
-                      Positioned.fill(
-                        child: const AuroraBackdrop(
-                          accentA: AppColors.accentPrimary,
-                          accentB: AppColors.accentDeep,
-                          opacity: 0.24,
-                        )
-                            .animate(
-                              onPlay: (c) => c.repeat(reverse: true),
-                            )
-                            .scaleXY(
-                              begin: 0.85,
-                              end: 1.0,
-                              duration: 1600.ms,
-                              curve: Curves.easeInOut,
-                            ),
-                      ),
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color:
-                              AppColors.accentPrimary.withValues(alpha: 0.16),
-                          border: Border.all(
-                            color:
-                                AppColors.accentPrimary.withValues(alpha: 0.45),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accentPrimary
-                                  .withValues(alpha: 0.3),
-                              blurRadius: 24,
-                              spreadRadius: -4,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          LucideIcons.trendingUp,
-                          size: 32,
-                          color: AppColors.accentPrimary,
-                        ),
-                      ),
-                    ],
+                    children: _buildLoaderChildren(accentColor, _shouldAnimate, _controller),
                   ),
                 ),
                 const SizedBox(height: AppSpacingTokens.lg),
                 ShaderMask(
-                  shaderCallback:
-                      AppGradients.action(AppColors.accentPrimary).createShader,
+                  shaderCallback: AppGradients.action(accentColor).createShader,
                   child: const Text(
                     'Ascend',
                     style: TextStyle(
@@ -244,7 +305,9 @@ class _LoadingScreen extends StatelessWidget {
                 Text(
                   'Initializing your data…',
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.7)
+                        : scheme.onSurfaceVariant.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -258,9 +321,6 @@ class _LoadingScreen extends StatelessWidget {
 
 class _ErrorScreen extends StatelessWidget {
   final String error;
-
-  /// Starts a fresh database attempt. Owned by `_AscendAppState` because only
-  /// it can replace the future the `FutureBuilder` is watching.
   final VoidCallback onRetry;
 
   const _ErrorScreen({required this.error, required this.onRetry});
@@ -268,13 +328,16 @@ class _ErrorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final bgColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final errorColor = scheme.error;
 
     return Scaffold(
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            // Scrollable: a verbose database error on a small phone used to
-            // overflow, which hid the retry button entirely.
             padding: const EdgeInsets.all(AppSpacingTokens.lg),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
@@ -289,9 +352,9 @@ class _ErrorScreen extends StatelessWidget {
                       children: [
                         Positioned.fill(
                           child: AuroraBackdrop(
-                            accentA: theme.colorScheme.error,
+                            accentA: errorColor,
                             accentB: AppColors.accentWarm,
-                            opacity: 0.2,
+                            opacity: isDark ? 0.2 : 0.1,
                           ),
                         ),
                         Container(
@@ -299,18 +362,10 @@ class _ErrorScreen extends StatelessWidget {
                           height: 60,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color:
-                                theme.colorScheme.error.withValues(alpha: 0.16),
-                            border: Border.all(
-                              color: theme.colorScheme.error
-                                  .withValues(alpha: 0.4),
-                            ),
+                            color: errorColor.withValues(alpha: 0.16),
+                            border: Border.all(color: errorColor.withValues(alpha: 0.4)),
                           ),
-                          child: Icon(
-                            LucideIcons.circleAlert,
-                            size: 30,
-                            color: theme.colorScheme.error,
-                          ),
+                          child: Icon(LucideIcons.circleAlert, size: 30, color: errorColor),
                         ),
                       ],
                     ),
@@ -319,8 +374,7 @@ class _ErrorScreen extends StatelessWidget {
                   Text(
                     "Couldn't open your data",
                     textAlign: TextAlign.center,
-                    style: AppTextStyles.headlineSmall
-                        .copyWith(fontWeight: FontWeight.w800),
+                    style: AppTextStyles.headlineSmall.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: AppSpacingTokens.sm),
                   Text(
@@ -328,26 +382,17 @@ class _ErrorScreen extends StatelessWidget {
                     'could not be opened, nothing has been lost yet.',
                     textAlign: TextAlign.center,
                     style: AppTextStyles.bodyMedium.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: scheme.onSurfaceVariant,
                       height: 1.5,
                     ),
                   ),
                   const SizedBox(height: AppSpacingTokens.md),
-                  // The raw message is kept, but demoted to small monospace in
-                  // an inset well: it is diagnostic detail, not the headline,
-                  // and at body size it was the first thing on screen. The
-                  // generic 'monospace' keyword resolved to a different face per
-                  // platform, so this now names the bundled family directly.
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(AppSpacingTokens.sm + 4),
                     decoration: BoxDecoration(
-                      color: AppColors.insetFill(
-                        theme.colorScheme,
-                        opacity: 0.5,
-                      ),
-                      borderRadius:
-                          BorderRadius.circular(AppRadiusTokens.input),
+                      color: AppColors.insetFill(scheme, opacity: 0.5),
+                      borderRadius: BorderRadius.circular(AppRadiusTokens.input),
                     ),
                     child: Text(
                       error,
@@ -355,7 +400,7 @@ class _ErrorScreen extends StatelessWidget {
                         fontFamily: AppTextStyles.monoFontFamily,
                         fontSize: 11,
                         height: 1.4,
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -363,7 +408,7 @@ class _ErrorScreen extends StatelessWidget {
                   GlowButton(
                     label: 'Retry',
                     icon: LucideIcons.refreshCw,
-                    accent: theme.colorScheme.primary,
+                    accent: scheme.primary,
                     width: double.infinity,
                     onPressed: onRetry,
                   ),

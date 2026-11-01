@@ -129,6 +129,45 @@ jobs:
       - name: Build iOS app (unsigned)
         run: flutter build ios --release --no-codesign
 
+      # `--no-codesign` leaves the main binary unsigned, but Flutter's two
+      # frameworks keep the ad-hoc signature the engine ships with. Some
+      # re-signers (Sideloadly included) skip binaries that already look
+      # signed, so they end up signing `Runner` with the user's certificate
+      # while `App.framework` and `Flutter.framework` stay ad-hoc. iOS
+      # requires every Mach-O in the bundle to be signed by the same team,
+      # so the app installs and then dies on launch: white launch screen,
+      # straight back to the home screen, before any Dart runs.
+      #
+      # Strip every signature so the artifact is genuinely unsigned and the
+      # re-signer has to sign all of it.
+      - name: Strip signatures so the IPA is genuinely unsigned
+        run: |
+          APP=build/ios/iphoneos/Runner.app
+          while IFS= read -r -d '' bin; do
+            if file "$bin" | grep -q 'Mach-O'; then
+              codesign --remove-signature "$bin" 2>/dev/null || true
+            fi
+          done < <(find "$APP" -type f -print0)
+          find "$APP" -type d -name _CodeSignature -exec rm -rf {} +
+
+      - name: Verify the IPA payload is unsigned
+        run: |
+          APP=build/ios/iphoneos/Runner.app
+          fail=0
+          while IFS= read -r -d '' bin; do
+            if file "$bin" | grep -q 'Mach-O' && otool -l "$bin" | grep -q LC_CODE_SIGNATURE; then
+              echo "::error::$bin still carries a code signature"
+              fail=1
+            fi
+          done < <(find "$APP" -type f -print0)
+          if find "$APP" -type d -name _CodeSignature | grep -q .; then
+            echo "::error::a _CodeSignature directory survived"
+            find "$APP" -type d -name _CodeSignature
+            fail=1
+          fi
+          if [ "$fail" -eq 0 ]; then echo "bundle is genuinely unsigned"; fi
+          exit "$fail"
+
       - name: Verify the bundle was actually produced
         run: |
           APP=build/ios/iphoneos/Runner.app

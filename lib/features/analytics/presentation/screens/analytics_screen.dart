@@ -93,7 +93,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                     .animate()
                     .fadeIn(
                       delay: Duration(
-                        milliseconds: (index * 55).clamp(0, 400),
+                        milliseconds:
+                            AppAnimationTokens.stagger.inMilliseconds *
+                                index.clamp(0, AppAnimationTokens.maxStaggerItems),
                       ),
                       duration: AppAnimationTokens.slow,
                     )

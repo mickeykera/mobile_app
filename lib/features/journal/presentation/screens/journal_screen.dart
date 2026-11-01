@@ -483,7 +483,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                   ),
                 ],
               ),
-            ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+            ).animate().scale(duration: AppAnimationTokens.slow, curve: Curves.easeOutCubic),
             const SizedBox(height: AppSpacingTokens.lg),
             Text(
               title,

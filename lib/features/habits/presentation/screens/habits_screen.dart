@@ -578,7 +578,10 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       )
           .animate()
           .fadeIn(
-            delay: Duration(milliseconds: 55 * index.clamp(0, 12)),
+            delay: Duration(
+              milliseconds: AppAnimationTokens.stagger.inMilliseconds *
+                  index.clamp(0, AppAnimationTokens.maxStaggerItems),
+            ),
           )
           .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic);
     });
@@ -616,7 +619,10 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       )
           .animate()
           .fadeIn(
-            delay: Duration(milliseconds: 55 * index.clamp(0, 12)),
+            delay: Duration(
+              milliseconds: AppAnimationTokens.stagger.inMilliseconds *
+                  index.clamp(0, AppAnimationTokens.maxStaggerItems),
+            ),
           )
           .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic);
     });

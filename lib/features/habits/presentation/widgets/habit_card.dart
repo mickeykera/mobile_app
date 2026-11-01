@@ -575,17 +575,18 @@ class _CompletionToggleState extends State<_CompletionToggle>
     if (widget.isCompleted == oldWidget.isCompleted) return;
 
     if (widget.isCompleted) {
+      if (_pop.isAnimating) return;
       HapticFeedback.mediumImpact();
       _pop.forward(from: 0);
     } else {
-      // Return to rest so an interrupt mid-bounce does not leave the circle
-      // stuck slightly oversized.
+      _pop.stop(canceled: true);
       _pop.animateTo(1, duration: AppAnimationTokens.medium);
     }
   }
 
   @override
   void dispose() {
+    _pop.stop(canceled: true);
     _pop.dispose();
     super.dispose();
   }

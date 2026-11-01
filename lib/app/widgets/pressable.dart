@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import '../theme/app_theme.dart';
 
@@ -76,10 +77,23 @@ class Pressable extends StatefulWidget {
 
 class _PressableState extends State<Pressable> {
   bool _pressed = false;
+  Timer? _hapticTimer;
 
   void _setPressed(bool value) {
     if (_pressed == value) return;
     setState(() => _pressed = value);
+  }
+
+  void _triggerHaptic() {
+    if (widget.haptics) {
+      HapticFeedback.lightImpact();
+    }
+  }
+
+  @override
+  void dispose() {
+    _hapticTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -91,11 +105,23 @@ class _PressableState extends State<Pressable> {
       onTapDown: enabled
           ? (_) {
               _setPressed(true);
-              if (widget.haptics) HapticFeedback.lightImpact();
+              // Delay haptic slightly; cancel if this becomes a drag/scroll.
+              _hapticTimer?.cancel();
+              _hapticTimer = Timer(const Duration(milliseconds: 50), _triggerHaptic);
             }
           : null,
-      onTapUp: enabled ? (_) => _setPressed(false) : null,
-      onTapCancel: enabled ? () => _setPressed(false) : null,
+      onTapUp: enabled
+          ? (_) {
+              _setPressed(false);
+              _hapticTimer?.cancel();
+            }
+          : null,
+      onTapCancel: enabled
+          ? () {
+              _setPressed(false);
+              _hapticTimer?.cancel();
+            }
+          : null,
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
       child: AnimatedScale(

@@ -54,7 +54,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
       vsync: this,
       // ~4s each way. Faster than this reads as a heartbeat; slower stops
       // registering as motion at all.
-      duration: const Duration(milliseconds: 4000),
+      duration: AppAnimationTokens.breath,
     );
   }
 
@@ -70,23 +70,32 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
     _syncBreath();
   }
 
+  void _breathCycle() {
+    if (!_breath.isAnimating) {
+      _breath.forward().then((_) {
+        if (mounted && _breath.isAnimating) {
+          _breath.reverse().then((_) => _breathCycle());
+        }
+      });
+    }
+  }
+
   void _syncBreath() {
     final session = widget.session;
     final shouldBreathe =
         session != null && session.isActive && !session.isPaused;
 
     if (shouldBreathe) {
-      if (!_breath.isAnimating) _breath.repeat(reverse: true);
+      if (!_breath.isAnimating) _breathCycle();
     } else {
-      // Settle back to neutral rather than freezing wherever the breath stopped,
-      // so pausing mid-inhale does not leave a half-grown halo.
-      _breath.stop();
+      _breath.stop(canceled: true);
       _breath.animateTo(0, duration: AppAnimationTokens.slow);
     }
   }
 
   @override
   void dispose() {
+    _breath.stop(canceled: true);
     _breath.dispose();
     super.dispose();
   }
@@ -150,43 +159,41 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // A breathing halo rather than a solid disc: this is the resting state,
-        // and it should invite rather than demand attention.
-        _BreathingHalo(
-          controller: _breath,
-          child: SizedBox(
-            width: 150,
-            height: 150,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        colorScheme.primary.withValues(alpha: 0.22),
-                        AppColors.accentDeep.withValues(alpha: 0.12),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: colorScheme.primary.withValues(alpha: 0.35),
-                    ),
-                  ),
-                ),
-                Icon(
-                  LucideIcons.crosshair,
-                  size: 66,
-                  color: colorScheme.primary,
-                ),
+        // A subtle static glow rather than a breathing halo: the setup screen is
+        // a moment of intent, not waiting. The breath animation belongs to the
+        // active session where time is actually moving.
+        Container(
+          width: 150,
+          height: 150,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.primary.withValues(alpha: 0.22),
+                AppColors.accentDeep.withValues(alpha: 0.12),
               ],
             ),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.35),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(alpha: 0.25),
+                blurRadius: 30,
+                spreadRadius: 4,
+              ),
+            ],
           ),
-        ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+          child: Center(
+            child: Icon(
+              LucideIcons.crosshair,
+              size: 66,
+              color: colorScheme.primary,
+            ),
+          ),
+        ).animate().scale(duration: AppAnimationTokens.slow, curve: Curves.easeOutCubic),
         const SizedBox(height: AppSpacingTokens.xl),
         const Text(
           'Ready to Focus?',
@@ -211,7 +218,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
           icon: LucideIcons.play,
           accent: colorScheme.primary,
           onPressed: widget.onStart,
-        ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
+        ).animate().fadeIn(delay: AppAnimationTokens.medium).slideY(begin: 0.2, end: 0),
         if (state.selectedHabitId != null || state.projectName != null) ...[
           const SizedBox(height: AppSpacingTokens.sm),
           TextButton.icon(
@@ -428,7 +435,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
     // a glance, which is the one job it has.
     return AnimatedBuilder(
       animation: _breath,
-      builder: (context, child) {
+      builder: (context, _) {
         final t = Curves.easeInOut.transform(_breath.value);
         final scale = 1 + t * 0.035;
         final glow = 0.35 + t * 0.3;
@@ -444,85 +451,89 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
               ),
             ],
           ),
-          // Named so tests can sample the breath. There are several `Transform`s
-          // in this subtree (the entrance scale, the icon swaps) and the
-          // breathing one is the only one whose scale is neither 1 nor constant.
           child: Transform.scale(
             key: const ValueKey('focus-breath'),
             scale: scale,
-            child: child,
+            child: _buildTimerRing(progress, color, session),
           ),
         );
       },
-      child: SizedBox(
-        width: 280,
-        height: 280,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // A wide, faint outer ring behind the arc: reads as the halo of the
-            // light source rather than as a second progress indicator, because
-            // it never changes value.
-            SizedBox(
-              width: 268,
-              height: 268,
-              child: CircularProgressIndicator(
-                value: 1,
-                strokeWidth: 1,
-                backgroundColor: Colors.transparent,
+    );
+  }
+
+  Widget _buildTimerRing(double progress, Color color, FocusSession session) {
+    final theme = Theme.of(context);
+    final formattedTime =
+        session.isBreak ? session.formattedRemaining : session.formattedElapsed;
+
+    return SizedBox(
+      width: 280,
+      height: 280,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // A wide, faint outer ring behind the arc: reads as the halo of the
+          // light source rather than as a second progress indicator, because
+          // it never changes value.
+          SizedBox(
+            width: 268,
+            height: 268,
+            child: CircularProgressIndicator(
+              value: 1,
+              strokeWidth: 1,
+              backgroundColor: Colors.transparent,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                color.withValues(alpha: 0.18),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 268,
+            height: 268,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: AppAnimationTokens.slow,
+              curve: Curves.easeOutCubic,
+              builder: (context, value, _) => CircularProgressIndicator(
+                value: value,
+                strokeWidth: 12,
+                strokeCap: StrokeCap.round,
+                backgroundColor: color.withValues(alpha: 0.12),
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  color.withValues(alpha: 0.18),
+                  // A gradient that rotates around the ring would be prettier,
+                  // but a SweepGradient on a progress indicator jumps at the
+                  // wrap point and reads as a glitch. A two-stop gradient along
+                  // the arc stays smooth.
+                  Color.lerp(color, AppColors.accentDeep, 0.45) ?? color,
                 ),
               ),
             ),
-            SizedBox(
-              width: 268,
-              height: 268,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: progress),
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.easeOutCubic,
-                builder: (context, value, _) => CircularProgressIndicator(
-                  value: value,
-                  strokeWidth: 12,
-                  strokeCap: StrokeCap.round,
-                  backgroundColor: color.withValues(alpha: 0.12),
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    // A gradient that rotates around the ring would be prettier,
-                    // but a SweepGradient on a progress indicator jumps at the
-                    // wrap point and reads as a glitch. A two-stop gradient along
-                    // the arc stays smooth.
-                    Color.lerp(color, AppColors.accentDeep, 0.45) ?? color,
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSwitcher(
+                duration: AppAnimationTokens.fast,
+                child: Text(
+                  formattedTime,
+                  key: ValueKey(formattedTime),
+                  style: AppTextStyles.displaySmall.copyWith(
+                    fontWeight: FontWeight.w300,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ),
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedSwitcher(
-                  duration: AppAnimationTokens.fast,
-                  child: Text(
-                    formattedTime,
-                    key: ValueKey(formattedTime),
-                    style: AppTextStyles.displaySmall.copyWith(
-                      fontWeight: FontWeight.w300,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
+              const SizedBox(height: AppSpacingTokens.sm),
+              Text(
+                session.isBreak ? 'Time to recharge' : 'Stay focused',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(height: AppSpacingTokens.sm),
-                Text(
-                  session.isBreak ? 'Time to recharge' : 'Stay focused',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ).animate().fadeIn(duration: 300.ms),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -640,7 +651,7 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
                 accent: phaseColor,
                 onPressed: widget.onResume,
                 height: 52,
-              ).animate().scale(duration: 200.ms, curve: Curves.elasticOut)
+              ).animate().scale(duration: AppAnimationTokens.fast, curve: Curves.easeOutCubic)
             else
               OutlinedButton.icon(
                 onPressed: widget.onPause,
@@ -683,41 +694,4 @@ class _FocusTimerState extends ConsumerState<FocusTimer>
   }
 }
 
-/// A soft glow that swells and fades around [child] on [controller].
-///
-/// The scale and the shadow are driven from the same value so the two can never
-/// drift out of phase, which is what makes a separate "pulse in, glow out"
-/// implementation look seasick.
-class _BreathingHalo extends StatelessWidget {
-  final AnimationController controller;
-  final Widget child;
 
-  const _BreathingHalo({required this.controller, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        final t = Curves.easeInOut.transform(controller.value);
-        return Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.18 + t * 0.18),
-                blurRadius: 30 + t * 24,
-                spreadRadius: t * 4,
-              ),
-            ],
-          ),
-          child: Transform.scale(scale: 1 + t * 0.04, child: child),
-        );
-      },
-      child: child,
-    );
-  }
-}

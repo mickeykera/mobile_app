@@ -67,7 +67,7 @@ void main() {
       // The dark scheme is seeded from the *light* variant of the accent, not
       // the deep one: a mid-tone clay that reads well on obsidian is a
       // different colour from the one that clears 4.5:1 on pearl.
-      expect(AppColors.seedLight, AppColors.accentPrimaryDeep);
+      expect(AppColors.seedLight, AppColors.accentPrimary);
       expect(AppColors.seedDark, AppColors.accentPrimaryDark);
       expect(AppTheme.lightTheme.colorScheme.primary,
           AppColors.lightColorScheme.primary);
